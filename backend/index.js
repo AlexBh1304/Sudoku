@@ -28,6 +28,7 @@ io.on('connection', (socket) => {
     const sala = getSala(codigo);
     if (sala && sala.jugadores.length > 0) sala.jugadores[0].color = color;
     sala.dificultad = dificultad;
+    sala.colores = [color];
     // Generar tablero según dificultad
     sala.tablero = generarSudoku(dificultad);
     socket.join(codigo);
@@ -38,11 +39,16 @@ io.on('connection', (socket) => {
 
   // Unirse a sala
   socket.on('unirseSala', ({ codigo, nombre, color }, callback) => {
+    const sala = getSala(codigo);
+    if (sala && sala.colores && sala.colores.includes(color)) {
+      callback({ exito: false, mensaje: 'Color ya usado, elige otro' });
+      return;
+    }
     const resultado = unirseSala(codigo, nombre);
     if (resultado.exito) {
       setJugadorId(codigo, nombre, socket.id);
-      const sala = getSala(codigo);
       if (sala && sala.jugadores.length > 1) sala.jugadores[1].color = color;
+      if (sala && sala.colores) sala.colores.push(color);
       socket.join(codigo);
       callback({ exito: true });
       io.to(codigo).emit('salaActualizada', getSala(codigo));
@@ -74,6 +80,15 @@ io.on('connection', (socket) => {
       const tablero = getOrCreateTablero(codigo);
       socket.emit('tableroActualizado', tablero);
     }
+  });
+
+  // Sincronizar selección de celda
+  socket.on('seleccionarCelda', ({ codigo, row, col }) => {
+    const sala = getSala(codigo);
+    if (!sala) return;
+    const jugador = sala.jugadores.find(j => j.id === socket.id);
+    if (!jugador) return;
+    io.to(codigo).emit('celdaSeleccionada', { row, col, color: jugador.color, nombre: jugador.nombre });
   });
 
   socket.on('disconnect', () => {

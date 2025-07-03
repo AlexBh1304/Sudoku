@@ -31,6 +31,26 @@ export default function TableroSudoku({ sala, socket }) {
     socket.emit('actualizarTablero', { codigo: sala.codigo, board: nuevo });
   };
 
+  // Al seleccionar una celda, notificar a la sala
+  const handleFocus = (row, col) => {
+    setSelected({ row, col });
+    socket.emit('seleccionarCelda', { codigo: sala.codigo, row, col });
+  };
+
+  // Estado para celdas seleccionadas por otros jugadores
+  const [selecciones, setSelecciones] = useState([]);
+
+  useEffect(() => {
+    const handleSeleccion = ({ row, col, color, nombre }) => {
+      if (nombre === sala.nombre) return; // No mostrar mi propia selección
+      setSelecciones([{ row, col, color, nombre }]);
+    };
+    socket.on('celdaSeleccionada', handleSeleccion);
+    return () => {
+      socket.off('celdaSeleccionada', handleSeleccion);
+    };
+  }, [socket, sala.nombre]);
+
   if (!board) return <div>Cargando tablero...</div>;
 
   return (
@@ -43,7 +63,7 @@ export default function TableroSudoku({ sala, socket }) {
               value={celda.value}
               maxLength={1}
               disabled={celda.fixed}
-              onFocus={() => setSelected({ row: r, col: c })}
+              onFocus={() => handleFocus(r, c)}
               onChange={e => {
                 const val = e.target.value.replace(/[^1-9]/, '');
                 handleInput(r, c, val);
@@ -53,7 +73,8 @@ export default function TableroSudoku({ sala, socket }) {
                 height: 36,
                 textAlign: 'center',
                 fontSize: 20,
-                border: selected.row === r && selected.col === c ? '2px solid #000' : '1px solid #aaa',
+                border: selected.row === r && selected.col === c ? `2.5px solid ${sala.color}` :
+                  (selecciones.some(s => s.row === r && s.col === c) ? `2px solid ${selecciones.find(s => s.row === r && s.col === c).color}` : '1px solid #aaa'),
                 background: celda.fixed ? '#eee' : (celda.color || '#fff'),
                 outline: 'none',
                 fontWeight: celda.fixed ? 'bold' : 'normal',
