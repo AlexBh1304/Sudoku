@@ -57,8 +57,14 @@ function generarSudoku(dificultad = 'facil') {
   let board = Array(9).fill(0).map(() => Array(9).fill(0));
   fillBoard(board);
   let puzzle = removeCells(board, dificultad);
-  // Devuelve el tablero en formato [{value, color}] para cada celda
-  return puzzle.map(fila => fila.map(num => ({ value: num === 0 ? '' : num.toString(), color: null })));
+  // Devuelve el tablero en formato [{value, color, fixed}] para cada celda
+  return puzzle.map((fila, r) =>
+    fila.map((num, c) => ({
+      value: num === 0 ? '' : num.toString(),
+      color: null,
+      fixed: num !== 0 // true si es pregenerada
+    }))
+  );
 }
 
 module.exports = { generarSudoku };

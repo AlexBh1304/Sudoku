@@ -42,6 +42,7 @@ export default function TableroSudoku({ sala, socket }) {
               key={c}
               value={celda.value}
               maxLength={1}
+              disabled={celda.fixed}
               onFocus={() => setSelected({ row: r, col: c })}
               onChange={e => {
                 const val = e.target.value.replace(/[^1-9]/, '');
@@ -53,8 +54,9 @@ export default function TableroSudoku({ sala, socket }) {
                 textAlign: 'center',
                 fontSize: 20,
                 border: selected.row === r && selected.col === c ? '2px solid #000' : '1px solid #aaa',
-                background: celda.color || '#fff',
+                background: celda.fixed ? '#eee' : (celda.color || '#fff'),
                 outline: 'none',
+                fontWeight: celda.fixed ? 'bold' : 'normal',
               }}
             />
           ))}
