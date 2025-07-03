@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import logo from './logo.svg';
 import './App.css';
 import SalaForm from './components/SalaForm';
+import TableroSudoku from './components/TableroSudoku';
 
 function App() {
   const [sala, setSala] = useState(null);
@@ -31,7 +32,7 @@ function App() {
         readOnly
         onFocus={e => e.target.select()}
       />
-      {/* Aquí irá el tablero y lógica de juego */}
+      <TableroSudoku sala={sala} socket={sala.socket} />
     </div>
   );
 }

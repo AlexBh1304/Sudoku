@@ -41,4 +41,14 @@ function setJugadorId(codigo, nombre, id) {
   if (jugador) jugador.id = id;
 }
 
-module.exports = { crearSala, unirseSala, getSala, setJugadorId, salas };
+function getOrCreateTablero(codigo) {
+  const sala = salas[codigo];
+  if (!sala) return null;
+  if (!sala.tablero) {
+    // Inicializa un tablero vacío si no existe
+    sala.tablero = Array(9).fill(0).map(() => Array(9).fill({ value: '', color: null }));
+  }
+  return sala.tablero;
+}
+
+module.exports = { crearSala, unirseSala, getSala, setJugadorId, salas, getOrCreateTablero };
