@@ -1,11 +1,21 @@
 import React, { useState } from 'react';
 import { io } from 'socket.io-client';
 
+const colores = [
+  '#e57373', // rojo
+  '#64b5f6', // azul
+  '#81c784', // verde
+  '#ffd54f', // amarillo
+  '#ba68c8', // morado
+  '#ffb74d', // naranja
+];
+
 const socket = io('http://localhost:3001'); // Cambia la URL al desplegar
 
 export default function SalaForm({ onSalaEntrar, codigoURL }) {
   const [nombre, setNombre] = useState('');
   const [codigo, setCodigo] = useState('');
+  const [color, setColor] = useState(colores[0]);
   const [modo, setModo] = useState('crear');
   const [mensaje, setMensaje] = useState('');
 
@@ -20,9 +30,9 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
   const handleCrear = (e) => {
     e.preventDefault();
     if (!nombre) return setMensaje('Pon tu nombre');
-    socket.emit('crearSala', { nombre }, (res) => {
+    socket.emit('crearSala', { nombre, color }, (res) => {
       if (res.exito) {
-        onSalaEntrar({ codigo: res.codigo, nombre, socket });
+        onSalaEntrar({ codigo: res.codigo, nombre, color, socket });
       } else {
         setMensaje('Error al crear sala');
       }
@@ -32,9 +42,9 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
   const handleUnirse = (e) => {
     e.preventDefault();
     if (!nombre || !codigo) return setMensaje('Pon tu nombre y código');
-    socket.emit('unirseSala', { codigo: codigo.toUpperCase(), nombre }, (res) => {
+    socket.emit('unirseSala', { codigo: codigo.toUpperCase(), nombre, color }, (res) => {
       if (res.exito) {
-        onSalaEntrar({ codigo: codigo.toUpperCase(), nombre, socket });
+        onSalaEntrar({ codigo: codigo.toUpperCase(), nombre, color, socket });
       } else {
         setMensaje(res.mensaje || 'No se pudo unir');
       }
@@ -61,6 +71,25 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
             style={{ width: '100%', marginBottom: 8 }}
           />
         )}
+        <div style={{ marginBottom: 8 }}>
+          <span>Color: </span>
+          {colores.map(c => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              style={{
+                background: c,
+                border: color === c ? '3px solid #333' : '1px solid #ccc',
+                width: 28,
+                height: 28,
+                marginRight: 4,
+                borderRadius: '50%',
+                cursor: 'pointer',
+              }}
+            />
+          ))}
+        </div>
         <button type="submit" style={{ width: '100%', marginBottom: 8 }}>
           {modo === 'crear' ? 'Crear y entrar' : 'Unirse'}
         </button>
