@@ -4,8 +4,6 @@ export default function TableroSudoku({ sala, socket }) {
   const [board, setBoard] = useState(null);
   const [selected, setSelected] = useState({ row: null, col: null });
   const [selecciones, setSelecciones] = useState([]);
-  const [errores, setErrores] = useState({});
-  const [fin, setFin] = useState(null);
 
   // Recibe actualizaciones del tablero
   useEffect(() => {
@@ -31,18 +29,6 @@ export default function TableroSudoku({ sala, socket }) {
       socket.off('celdaSeleccionada', handleSeleccion);
     };
   }, [socket, sala.nombre]);
-
-  // Actualiza errores y estado de fin de juego
-  useEffect(() => {
-    socket.on('erroresActualizados', setErrores);
-    socket.on('finJuego', ({ perdedor }) => {
-      setFin(perdedor);
-    });
-    return () => {
-      socket.off('erroresActualizados', setErrores);
-      socket.off('finJuego');
-    };
-  }, [socket]);
 
   // Al seleccionar una celda, notificar a la sala
   const handleFocus = (row, col) => {
@@ -96,18 +82,9 @@ export default function TableroSudoku({ sala, socket }) {
   };
 
   if (!board) return <div>Cargando tablero...</div>;
-  if (fin) {
-    return <div style={{ color: 'red', fontWeight: 'bold', fontSize: 24, margin: 24 }}>¡Juego terminado! {fin} alcanzó el máximo de errores.</div>;
-  }
 
   return (
     <div style={{ display: 'inline-block', border: '2px solid #333', marginTop: 24 }}>
-      <div style={{ marginBottom: 8, textAlign: 'center' }}>
-        <span>Errores: </span>
-        {Object.entries(errores).map(([nombre, n]) => (
-          <span key={nombre} style={{ marginRight: 12, color: nombre === sala.nombre ? sala.color : '#333' }}>{nombre}: {n}</span>
-        ))}
-      </div>
       <div style={{ marginBottom: 8, textAlign: 'center' }}>
         {[1,2,3,4,5,6,7,8,9].map(n => (
           <button key={n} onClick={() => handleButton(n)} style={{ width: 36, height: 36, margin: 2, fontSize: 18 }}>{n}</button>

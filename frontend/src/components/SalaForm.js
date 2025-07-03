@@ -19,7 +19,6 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
   const [modo, setModo] = useState('crear');
   const [mensaje, setMensaje] = useState('');
   const [dificultad, setDificultad] = useState('facil');
-  const [maxErrores, setMaxErrores] = useState('ilimitado');
 
   // Si recibimos un código por props, prellenar el campo y cambiar a modo unirse
   React.useEffect(() => {
@@ -32,9 +31,9 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
   const handleCrear = (e) => {
     e.preventDefault();
     if (!nombre) return setMensaje('Pon tu nombre');
-    socket.emit('crearSala', { nombre, color, dificultad, maxErrores }, (res) => {
+    socket.emit('crearSala', { nombre, color, dificultad }, (res) => {
       if (res.exito) {
-        onSalaEntrar({ codigo: res.codigo, nombre, color, dificultad, maxErrores, socket });
+        onSalaEntrar({ codigo: res.codigo, nombre, color, dificultad, socket });
       } else {
         setMensaje('Error al crear sala');
       }
@@ -100,23 +99,6 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
               <option value="media">Media</option>
               <option value="dificil">Difícil</option>
             </select>
-          </div>
-        )}
-        {modo === 'crear' && (
-          <div style={{ marginBottom: 8 }}>
-            <span>Errores máximos: </span>
-            <input
-              type="number"
-              min="1"
-              placeholder="ilimitado"
-              value={maxErrores === 'ilimitado' ? '' : maxErrores}
-              onChange={e => setMaxErrores(e.target.value === '' ? 'ilimitado' : e.target.value)}
-              style={{ width: 80, marginRight: 8 }}
-            />
-            <label>
-              <input type="checkbox" checked={maxErrores === 'ilimitado'} onChange={e => setMaxErrores(e.target.checked ? 'ilimitado' : 3)} />
-              Ilimitado
-            </label>
           </div>
         )}
         <button type="submit" style={{ width: '100%', marginBottom: 8 }}>
