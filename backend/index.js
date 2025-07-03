@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { crearSala, unirseSala, getSala, setJugadorId, getOrCreateTablero } = require('./sala/salaManager');
 const { generarSudoku } = require('./sudoku/sudokuGenerator');
+const { checkMove } = require('./sudoku/sudokuChecker');
 
 const app = express();
 const server = http.createServer(app);
@@ -28,9 +29,11 @@ io.on('connection', (socket) => {
     const sala = getSala(codigo);
     if (sala && sala.jugadores.length > 0) sala.jugadores[0].color = color;
     sala.dificultad = dificultad;
+    // Generar tablero y solución
+    const { tablero, solucion } = generarSudoku(dificultad);
+    sala.tablero = tablero;
+    sala.solucion = solucion;
     sala.colores = [color];
-    // Generar tablero según dificultad
-    sala.tablero = generarSudoku(dificultad);
     socket.join(codigo);
     callback({ exito: true, codigo });
     io.to(codigo).emit('salaActualizada', getSala(codigo));
@@ -52,20 +55,45 @@ io.on('connection', (socket) => {
       socket.join(codigo);
       callback({ exito: true });
       io.to(codigo).emit('salaActualizada', getSala(codigo));
-      // Enviar tablero actual
-      const tablero = getOrCreateTablero(codigo);
+      const tablero = sala.tablero;
       io.to(codigo).emit('tableroActualizado', tablero);
     } else {
       callback(resultado);
     }
   });
 
-  // Actualizar tablero
+  // Actualizar tablero y contar errores
   socket.on('actualizarTablero', ({ codigo, board }) => {
     const sala = getSala(codigo);
     if (sala) {
+      let row = -1, col = -1, value = '';
+      if (sala.tablero) {
+        for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) {
+            if (sala.tablero[r][c].value !== board[r][c].value) {
+              row = r; col = c; value = board[r][c].value;
+            }
+          }
+        }
+      }
+      // Verifica con la solución y reglas de Sudoku
+      let error = false;
+      if (value && row !== -1 && col !== -1 && sala.solucion) {
+        // 1. ¿Coincide con la solución?
+        const correcto = sala.solucion[row][col].toString() === value;
+        // 2. ¿No hay otro igual en fila, columna o bloque?
+        const unico = checkMove(board, row, col, value);
+        error = !correcto || !unico;
+        if (!sala.errores) sala.errores = {};
+        const jugador = sala.jugadores.find(j => j.id === socket.id);
+        if (jugador) {
+          if (!sala.errores[jugador.nombre]) sala.errores[jugador.nombre] = 0;
+          if (error) sala.errores[jugador.nombre]++;
+        }
+      }
       sala.tablero = board;
       io.to(codigo).emit('tableroActualizado', board);
+      io.to(codigo).emit('erroresActualizados', sala.errores || {});
     }
   });
 

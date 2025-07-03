@@ -4,6 +4,7 @@ export default function TableroSudoku({ sala, socket }) {
   const [board, setBoard] = useState(null);
   const [selected, setSelected] = useState({ row: null, col: null });
   const [selecciones, setSelecciones] = useState([]);
+  const [errores, setErrores] = useState({});
 
   // Recibe actualizaciones del tablero
   useEffect(() => {
@@ -29,6 +30,15 @@ export default function TableroSudoku({ sala, socket }) {
       socket.off('celdaSeleccionada', handleSeleccion);
     };
   }, [socket, sala.nombre]);
+
+  // Actualiza y muestra el número de errores
+  useEffect(() => {
+    const handleErrores = (err) => setErrores(err);
+    socket.on('erroresActualizados', handleErrores);
+    return () => {
+      socket.off('erroresActualizados', handleErrores);
+    };
+  }, [socket]);
 
   // Al seleccionar una celda, notificar a la sala
   const handleFocus = (row, col) => {
@@ -90,6 +100,13 @@ export default function TableroSudoku({ sala, socket }) {
           <button key={n} onClick={() => handleButton(n)} style={{ width: 36, height: 36, margin: 2, fontSize: 18 }}>{n}</button>
         ))}
         <button onClick={handleClear} style={{ width: 36, height: 36, margin: 2, fontSize: 18 }}>⟲</button>
+      </div>
+      <div style={{ marginBottom: 8, textAlign: 'center' }}>
+        {Object.entries(errores).map(([nombre, err]) => (
+          <span key={nombre} style={{ margin: 8, color: nombre === sala.nombre ? sala.color : '#333' }}>
+            {nombre}: {err} errores
+          </span>
+        ))}
       </div>
       {board.map((fila, r) => (
         <div key={r} style={{ display: 'flex' }}>

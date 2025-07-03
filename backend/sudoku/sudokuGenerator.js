@@ -56,15 +56,20 @@ function removeCells(board, dificultad) {
 function generarSudoku(dificultad = 'facil') {
   let board = Array(9).fill(0).map(() => Array(9).fill(0));
   fillBoard(board);
+  // Guardar la solución antes de quitar celdas
+  const solucion = board.map(row => row.slice());
   let puzzle = removeCells(board, dificultad);
-  // Devuelve el tablero en formato [{value, color, fixed}] para cada celda
-  return puzzle.map((fila, r) =>
-    fila.map((num, c) => ({
-      value: num === 0 ? '' : num.toString(),
-      color: null,
-      fixed: num !== 0 // true si es pregenerada
-    }))
-  );
+  // Devuelve el tablero y la solución
+  return {
+    tablero: puzzle.map((fila, r) =>
+      fila.map((num, c) => ({
+        value: num === 0 ? '' : num.toString(),
+        color: null,
+        fixed: num !== 0 // true si es pregenerada
+      }))
+    ),
+    solucion
+  };
 }
 
 module.exports = { generarSudoku };
