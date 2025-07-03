@@ -22,13 +22,15 @@ io.on('connection', (socket) => {
   console.log('Nuevo cliente conectado:', socket.id);
 
   // Crear sala
-  socket.on('crearSala', ({ nombre, color, dificultad }, callback) => {
+  socket.on('crearSala', ({ nombre, color, dificultad, maxErrores }, callback) => {
     const codigo = crearSala(nombre, dificultad);
     setJugadorId(codigo, nombre, socket.id);
     const sala = getSala(codigo);
     if (sala && sala.jugadores.length > 0) sala.jugadores[0].color = color;
     sala.dificultad = dificultad;
     sala.colores = [color];
+    sala.maxErrores = maxErrores === 'ilimitado' ? null : parseInt(maxErrores);
+    sala.errores = {};
     // Generar tablero según dificultad
     sala.tablero = generarSudoku(dificultad);
     socket.join(codigo);
@@ -63,10 +65,41 @@ io.on('connection', (socket) => {
   // Actualizar tablero
   socket.on('actualizarTablero', ({ codigo, board }) => {
     const sala = getSala(codigo);
-    if (sala) {
-      sala.tablero = board;
-      io.to(codigo).emit('tableroActualizado', board);
+    if (!sala) return;
+    // Validar si el movimiento es correcto
+    // Buscar la celda editada
+    let row = -1, col = -1, valor = '';
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (sala.tablero && sala.tablero[r][c].value !== board[r][c].value && !sala.tablero[r][c].fixed) {
+          row = r; col = c; valor = board[r][c].value;
+        }
+      }
     }
+    // Si se editó una celda
+    if (row !== -1 && valor) {
+      // Obtener la solución
+      if (!sala.solucion) {
+        // Generar la solución al crear el tablero
+        const { getSolucion } = require('./sudoku/sudokuGenerator');
+        sala.solucion = getSolucion(sala.tablero);
+      }
+      const correcto = sala.solucion && sala.solucion[row][col] === valor;
+      // Buscar jugador
+      const jugador = sala.jugadores.find(j => j.id === socket.id);
+      if (!jugador) return;
+      if (!correcto) {
+        sala.errores[jugador.nombre] = (sala.errores[jugador.nombre] || 0) + 1;
+        io.to(codigo).emit('erroresActualizados', sala.errores);
+        // Si se alcanzó el máximo de errores
+        if (sala.maxErrores && sala.errores[jugador.nombre] >= sala.maxErrores) {
+          io.to(codigo).emit('finJuego', { perdedor: jugador.nombre });
+          return;
+        }
+      }
+    }
+    sala.tablero = board;
+    io.to(codigo).emit('tableroActualizado', board);
   });
 
   // Permite a un cliente solicitar el tablero actual
