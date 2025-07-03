@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const { crearSala, unirseSala, getSala, setJugadorId, getOrCreateTablero } = require('./sala/salaManager');
+const { generarSudoku } = require('./sudoku/sudokuGenerator');
 
 const app = express();
 const server = http.createServer(app);
@@ -21,17 +22,18 @@ io.on('connection', (socket) => {
   console.log('Nuevo cliente conectado:', socket.id);
 
   // Crear sala
-  socket.on('crearSala', ({ nombre, color }, callback) => {
-    const codigo = crearSala(nombre);
+  socket.on('crearSala', ({ nombre, color, dificultad }, callback) => {
+    const codigo = crearSala(nombre, dificultad);
     setJugadorId(codigo, nombre, socket.id);
     const sala = getSala(codigo);
     if (sala && sala.jugadores.length > 0) sala.jugadores[0].color = color;
+    sala.dificultad = dificultad;
+    // Generar tablero según dificultad
+    sala.tablero = generarSudoku(dificultad);
     socket.join(codigo);
     callback({ exito: true, codigo });
     io.to(codigo).emit('salaActualizada', getSala(codigo));
-    // Enviar tablero inicial
-    const tablero = getOrCreateTablero(codigo);
-    io.to(codigo).emit('tableroActualizado', tablero);
+    io.to(codigo).emit('tableroActualizado', sala.tablero);
   });
 
   // Unirse a sala

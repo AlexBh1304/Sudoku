@@ -18,6 +18,7 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
   const [color, setColor] = useState(colores[0]);
   const [modo, setModo] = useState('crear');
   const [mensaje, setMensaje] = useState('');
+  const [dificultad, setDificultad] = useState('facil');
 
   // Si recibimos un código por props, prellenar el campo y cambiar a modo unirse
   React.useEffect(() => {
@@ -30,9 +31,9 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
   const handleCrear = (e) => {
     e.preventDefault();
     if (!nombre) return setMensaje('Pon tu nombre');
-    socket.emit('crearSala', { nombre, color }, (res) => {
+    socket.emit('crearSala', { nombre, color, dificultad }, (res) => {
       if (res.exito) {
-        onSalaEntrar({ codigo: res.codigo, nombre, color, socket });
+        onSalaEntrar({ codigo: res.codigo, nombre, color, dificultad, socket });
       } else {
         setMensaje('Error al crear sala');
       }
@@ -90,6 +91,16 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
             />
           ))}
         </div>
+        {modo === 'crear' && (
+          <div style={{ marginBottom: 8 }}>
+            <span>Dificultad: </span>
+            <select value={dificultad} onChange={e => setDificultad(e.target.value)}>
+              <option value="facil">Fácil</option>
+              <option value="media">Media</option>
+              <option value="dificil">Difícil</option>
+            </select>
+          </div>
+        )}
         <button type="submit" style={{ width: '100%', marginBottom: 8 }}>
           {modo === 'crear' ? 'Crear y entrar' : 'Unirse'}
         </button>

@@ -8,7 +8,7 @@ function generarCodigoSala() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-function crearSala(nombreCreador) {
+function crearSala(nombreCreador, dificultad) {
   let codigo;
   do {
     codigo = generarCodigoSala();
@@ -16,6 +16,7 @@ function crearSala(nombreCreador) {
   salas[codigo] = {
     jugadores: [{ id: null, nombre: nombreCreador }],
     tablero: null,
+    dificultad: dificultad || 'facil',
     estado: 'esperando',
     errores: {},
   };

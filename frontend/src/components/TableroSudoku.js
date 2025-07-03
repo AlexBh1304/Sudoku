@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
-function getEmptyBoard() {
-  return Array(9).fill(0).map(() => Array(9).fill().map(() => ({ value: '', color: null })));
-}
-
 export default function TableroSudoku({ sala, socket }) {
-  const [board, setBoard] = useState(getEmptyBoard());
+  const [board, setBoard] = useState(null);
   const [selected, setSelected] = useState({ row: null, col: null });
 
   // Recibe actualizaciones del tablero
@@ -23,6 +19,7 @@ export default function TableroSudoku({ sala, socket }) {
 
   // Enviar cambios al backend
   const handleInput = (row, col, value) => {
+    if (!board) return;
     const nuevo = board.map((fila, r) =>
       fila.map((celda, c) =>
         r === row && c === col
@@ -33,6 +30,8 @@ export default function TableroSudoku({ sala, socket }) {
     setBoard(nuevo);
     socket.emit('actualizarTablero', { codigo: sala.codigo, board: nuevo });
   };
+
+  if (!board) return <div>Cargando tablero...</div>;
 
   return (
     <div style={{ display: 'inline-block', border: '2px solid #333', marginTop: 24 }}>
