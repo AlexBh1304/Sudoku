@@ -400,11 +400,24 @@ export default function TableroSudoku({ sala, socket }) {
         <h4>Miembros</h4>
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {miembros.map((j, idx) => (
-            <li key={j.nombre} style={{ marginBottom: 8, fontWeight: sala.jugadores?.[0]?.nombre === j.nombre ? 'bold' : 'normal', color: j.color || '#333' }}>
+            <li key={j.nombre} style={{ marginBottom: 8, fontWeight: sala.jugadores?.[0]?.nombre === j.nombre ? 'bold' : 'normal', color: j.color || '#333', fontSize: 14 }}>
               {j.nombre} {idx === 0 ? <span style={{ fontSize: 12, color: '#888' }}>(anfitrión)</span> : ''}
+              <div style={{ fontSize: 11, color: '#888', marginLeft: 4 }}>
+                <span style={{ fontFamily: 'monospace' }}>id: {j.id || 'sin id'}</span>
+              </div>
             </li>
           ))}
         </ul>
+        <button
+          onClick={() => {
+            if (window.confirm('¿Seguro que quieres salir de la sala?')) {
+              window.location.reload(); // O redirigir a la pantalla de inicio si existe
+            }
+          }}
+          style={{ marginTop: 24, padding: '8px 18px', borderRadius: 6, background: '#e53935', color: '#fff', border: 'none', fontWeight: 'bold', fontSize: 15, width: '100%' }}
+        >
+          Salir de la sala
+        </button>
       </div>
       {/* Tablero y controles */}
       <div style={{ flex: 1 }}>

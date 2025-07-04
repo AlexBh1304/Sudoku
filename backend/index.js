@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { crearSala, unirseSala, getSala, setJugadorId, getOrCreateTablero } = require('./sala/salaManager');
+const { crearSala, unirseSala, getSala, setJugadorId, getOrCreateTablero, eliminarJugadorPorId, salas } = require('./sala/salaManager');
 const { generarSudoku } = require('./sudoku/sudokuGenerator');
 const { checkMove } = require('./sudoku/sudokuChecker');
 const { eliminarNotasTablero } = require('./sudoku/utilsNotas');
@@ -16,9 +16,9 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3001;
-
-// Estructura básica de salas en memoria
-const salas = {};
+// Mapa global para rastrear socket.id -> { nombre, codigo }
+const socketToUser = {};
+const COLORES_POSIBLES = ['#e57373','#64b5f6','#81c784','#ffd54f', '#ba68c8', '#ff8a65'];
 
 io.on('connection', (socket) => {
   console.log('Nuevo cliente conectado:', socket.id);
@@ -37,16 +37,25 @@ io.on('connection', (socket) => {
     sala.colores = [color];
     sala.tiempoInicio = Date.now();
     socket.join(codigo);
+    socketToUser[socket.id] = { nombre, codigo };
     callback({ exito: true, codigo });
     io.to(codigo).emit('salaActualizada', getSala(codigo));
     io.to(codigo).emit('tableroActualizado', sala.tablero);
     io.to(codigo).emit('temporizador', { inicio: sala.tiempoInicio });
+    // Log de creación de sala
+    console.log(`[SALA] Nueva sala creada: ${codigo} por ${nombre} (${color}) [${socket.id}]`);
+    console.log(`[SALA] Jugadores en sala ${codigo}:`, sala.jugadores.map(j => `${j.nombre} (${j.id || 'sin id'})`).join(', '));
+    console.log(`[SALA] Colores usados: ${sala.colores.join(', ')}`);
+    console.log(`[SALA] Colores disponibles: ${COLORES_POSIBLES.filter(c => !sala.colores.includes(c)).join(', ')}`);
   });
 
   // Unirse a sala
   socket.on('unirseSala', ({ codigo, nombre, color }, callback) => {
     const sala = getSala(codigo);
     if (sala && sala.colores && sala.colores.includes(color)) {
+      console.log(`[SALA] Color solicitado: ${color}`);
+      console.log(`[SALA] Colores usados: ${sala.colores.join(', ')}`);
+      console.log(`[SALA] Colores disponibles: ${COLORES_POSIBLES.filter(c => !sala.colores.includes(c)).join(', ')}`);
       callback({ exito: false, mensaje: 'Color ya usado, elige otro' });
       return;
     }
@@ -56,11 +65,17 @@ io.on('connection', (socket) => {
       if (sala && sala.jugadores.length > 1) sala.jugadores[1].color = color;
       if (sala && sala.colores) sala.colores.push(color);
       socket.join(codigo);
+      socketToUser[socket.id] = { nombre, codigo };
       callback({ exito: true });
       io.to(codigo).emit('salaActualizada', getSala(codigo));
       const tablero = sala.tablero;
       io.to(codigo).emit('tableroActualizado', tablero);
       if (sala.tiempoInicio) io.to(codigo).emit('temporizador', { inicio: sala.tiempoInicio });
+      // Log de unión a sala
+      console.log(`[SALA] ${nombre} (${color}) [${socket.id}] se unió a la sala ${codigo}`);
+      console.log(`[SALA] Jugadores en sala ${codigo}:`, sala.jugadores.map(j => `${j.nombre} (${j.id || 'sin id'})`).join(', '));
+      console.log(`[SALA] Colores usados: ${sala.colores.join(', ')}`);
+      console.log(`[SALA] Colores disponibles: ${COLORES_POSIBLES.filter(c => !sala.colores.includes(c)).join(', ')}`);
     } else {
       callback(resultado);
     }
@@ -193,7 +208,44 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('Cliente desconectado:', socket.id);
+    // Usar el mapa global para obtener nombre y sala
+    const user = socketToUser[socket.id];
+    if (user) {
+      console.log(`[SALA] Jugador desconectado: ${user.nombre} [${socket.id}] de la sala ${user.codigo}`);
+      // Eliminar jugador de la sala usando la función dedicada
+      eliminarJugadorPorId(user.codigo, socket.id);
+      const sala = getSala(user.codigo);
+      if (sala) {
+        console.log(`[DEBUG] Jugadores tras eliminar:`, sala.jugadores.map(j => `${j.nombre} (${j.id || 'sin id'})`).join(', '));
+        console.log(`[DEBUG] Colores tras eliminar: ${sala.colores ? sala.colores.join(', ') : ''}`);
+        console.log(`[DEBUG] Colores disponibles: ${COLORES_POSIBLES.filter(c => !(sala.colores||[]).includes(c)).join(', ')}`);
+        io.to(user.codigo).emit('salaActualizada', sala);
+      }
+      delete socketToUser[socket.id];
+    } else {
+      // Fallback: buscar en salas por si acaso
+      let salaCodigo = null;
+      let jugadorNombre = null;
+      for (const codigo in salas) {
+        const sala = salas[codigo];
+        const jugador = sala.jugadores.find(j => j.id === socket.id);
+        if (jugador) {
+          salaCodigo = codigo;
+          jugadorNombre = jugador.nombre;
+          eliminarJugadorPorId(salaCodigo, socket.id);
+          console.log(`[DEBUG] Jugadores tras eliminar (fallback):`, salas[salaCodigo].jugadores.map(j => `${j.nombre} (${j.id || 'sin id'})`).join(', '));
+          console.log(`[DEBUG] Colores tras eliminar (fallback): ${salas[salaCodigo].colores ? salas[salaCodigo].colores.join(', ') : ''}`);
+          console.log(`[DEBUG] Colores disponibles (fallback): ${COLORES_POSIBLES.filter(c => !(salas[salaCodigo].colores||[]).includes(c)).join(', ')}`);
+          io.to(salaCodigo).emit('salaActualizada', salas[salaCodigo]);
+          break;
+        }
+      }
+      if (salaCodigo && jugadorNombre) {
+        console.log(`[SALA] Jugador desconectado (fallback): ${jugadorNombre} [${socket.id}] de la sala ${salaCodigo}`);
+      } else {
+        console.log(`[SALA] Cliente desconectado: ${socket.id}`);
+      }
+    }
     // Aquí irá la lógica para limpiar salas si es necesario
   });
 });

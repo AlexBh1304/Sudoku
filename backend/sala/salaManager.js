@@ -52,4 +52,27 @@ function getOrCreateTablero(codigo) {
   return sala.tablero;
 }
 
-module.exports = { crearSala, unirseSala, getSala, setJugadorId, salas, getOrCreateTablero };
+function eliminarJugadorPorId(codigo, socketId) {
+  const sala = salas[codigo];
+  if (!sala) return;
+  // Buscar color del jugador por id
+  let colorAEliminar = null;
+  const jugador = sala.jugadores.find(j => j.id === socketId);
+  if (jugador && jugador.color) {
+    colorAEliminar = jugador.color;
+  } else if (sala.colores && sala.jugadores.length === 2) {
+    // Si el jugador no tiene color, pero hay dos colores, elimina el que no está en uso
+    const ids = sala.jugadores.map(j => j.id);
+    const coloresEnUso = sala.jugadores.map(j => j.color).filter(Boolean);
+    colorAEliminar = sala.colores.find(c => !coloresEnUso.includes(c));
+  }
+  if (colorAEliminar && sala.colores) {
+    sala.colores = sala.colores.filter(color => color !== colorAEliminar);
+  }
+  sala.jugadores = sala.jugadores.filter(j => j.id !== socketId);
+  if (sala.jugadores.length === 0) {
+    delete salas[codigo];
+  }
+}
+
+module.exports = { crearSala, unirseSala, getSala, setJugadorId, salas, getOrCreateTablero, eliminarJugadorPorId };
