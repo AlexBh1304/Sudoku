@@ -83,24 +83,25 @@ export default function TableroSudoku({ sala, socket }) {
     return `${min}:${sec}`;
   }
 
-  // Al seleccionar una celda, notificar a la sala
-  const handleFocus = (row, col) => {
-    setSelected({ row, col });
-    socket.emit('seleccionarCelda', { codigo: sala.codigo, row, col });
-  };
+  // Estado para número seleccionado (para iluminar iguales)
+  const [numeroSeleccionado, setNumeroSeleccionado] = useState(null);
 
-  // Guardar en historial antes de cada cambio
-  const guardarHistorial = (nuevoTablero) => {
-    setHistorial(h => {
-      const nuevo = [...h, board];
-      historialRef.current = nuevo;
-      return nuevo;
-    });
-  };
+  // Contar ocurrencias de cada número (para deshabilitar botones)
+  const numerosCompletados = React.useMemo(() => {
+    if (!board) return {};
+    const counts = {};
+    for (let n = 1; n <= 9; n++) counts[n] = 0;
+    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+      const v = board[r][c].value;
+      if (v && /^[1-9]$/.test(v)) counts[v]++;
+    }
+    return counts;
+  }, [board]);
 
-  // Lógica de input: modo normal y modo notas
+  // Modificar handleInput para bloquear input de números completados
   const handleInput = (row, col, value) => {
     if (!board) return;
+    if (numerosCompletados[value] >= 9) return; // Bloquea input por teclado si ya hay 9
     const celda = board[row][col];
     if (celda.fixed) return;
     if (!/^[1-9]$/.test(value)) return;
@@ -152,6 +153,27 @@ export default function TableroSudoku({ sala, socket }) {
     socket.emit('actualizarTablero', { codigo: sala.codigo, board: nuevo });
   };
 
+  // Modificar handleFocus: siempre selecciona el número de la celda (si existe)
+  const handleFocus = (row, col) => {
+    setSelected({ row, col });
+    const celda = board[row][col];
+    if (celda.value) {
+      setNumeroSeleccionado(celda.value);
+    } else {
+      setNumeroSeleccionado(null);
+    }
+    socket.emit('seleccionarCelda', { codigo: sala.codigo, row, col });
+  };
+
+  // Guardar en historial antes de cada cambio
+  const guardarHistorial = (nuevoTablero) => {
+    setHistorial(h => {
+      const nuevo = [...h, board];
+      historialRef.current = nuevo;
+      return nuevo;
+    });
+  };
+
   // Deshacer último cambio
   const handleUndo = () => {
     if (historialRef.current.length === 0) return;
@@ -180,10 +202,12 @@ export default function TableroSudoku({ sala, socket }) {
     return nuevo;
   }
 
-  // Botones del 1 al 9
+  // Modificar handleButton para deseleccionar número
   const handleButton = (num) => {
+    if (numerosCompletados[num] >= 9) return;
     if (selected.row === null || selected.col === null) return;
     handleInput(selected.row, selected.col, num.toString());
+    setNumeroSeleccionado(null);
   };
 
   // Borrar celda
@@ -216,7 +240,11 @@ export default function TableroSudoku({ sala, socket }) {
           {modoNotas ? 'Modo Notas: ON' : 'Modo Notas: OFF'}
         </button>
         {[1,2,3,4,5,6,7,8,9].map(n => (
-          <button key={n} onClick={() => handleButton(n)} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }}>{n}</button>
+          <button key={n} onClick={() => handleButton(n)}
+            disabled={numerosCompletados[n] >= 9}
+            style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: numerosCompletados[n] >= 9 ? '#ccc' : '#fff', boxShadow: '0 1px 2px #0001', opacity: numerosCompletados[n] >= 9 ? 0.5 : 1 }}>
+            {n}
+          </button>
         ))}
         <button onClick={handleUndo} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }}>⟲</button>
       </div>
@@ -276,6 +304,12 @@ export default function TableroSudoku({ sala, socket }) {
                 style.background = `${sala.color}55`;
                 style.boxShadow = `0 0 0 2px ${sala.color}44`;
               }
+              // Iluminado de celdas con el mismo número seleccionado (si hay número seleccionado)
+              const isSameNumber = numeroSeleccionado && celda.value === numeroSeleccionado;
+              if (isSameNumber) {
+                style.background = '#b3e5fc';
+                style.boxShadow = '0 0 0 2px #0288d1';
+              }
               if (selecciones.some(s => s.row === r && s.col === c)) {
                 const colorOtro = selecciones.find(s => s.row === r && s.col === c).color;
                 style.border = `2.5px solid ${colorOtro}`;
@@ -287,14 +321,19 @@ export default function TableroSudoku({ sala, socket }) {
                   <input
                     value={celda.value}
                     maxLength={1}
-                    disabled={celda.fixed}
+                    disabled={false} // Permite focus/click en todas las celdas
                     onFocus={() => handleFocus(r, c)}
                     onChange={e => {
+                      if (celda.fixed) return; // No permite modificar bloqueadas
                       const val = e.target.value.replace(/[^1-9]/, '');
                       if (!val) return;
                       handleInput(r, c, val);
                     }}
                     onKeyDown={e => {
+                      if (celda.fixed) {
+                        e.preventDefault();
+                        return;
+                      }
                       if (/^[1-9]$/.test(e.key)) {
                         e.preventDefault();
                         handleInput(r, c, e.key);
@@ -304,7 +343,7 @@ export default function TableroSudoku({ sala, socket }) {
                       }
                     }}
                     style={style}
-                    readOnly={false}
+                    readOnly={celda.fixed}
                   />
                   {/* Notas en la celda */}
                   {!celda.value && celda.notas && celda.notas.length > 0 && (
