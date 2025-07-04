@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function TableroSudoku({ sala, socket }) {
   const [board, setBoard] = useState(null);
@@ -9,6 +9,8 @@ export default function TableroSudoku({ sala, socket }) {
   const [tiempoInicio, setTiempoInicio] = useState(null);
   const [tiempoFinal, setTiempoFinal] = useState(null);
   const [finJuego, setFinJuego] = useState(null);
+  const [historial, setHistorial] = useState([]); // Historial global de tableros
+  const historialRef = useRef([]);
 
   // Recibe actualizaciones del tablero
   useEffect(() => {
@@ -87,6 +89,15 @@ export default function TableroSudoku({ sala, socket }) {
     socket.emit('seleccionarCelda', { codigo: sala.codigo, row, col });
   };
 
+  // Guardar en historial antes de cada cambio
+  const guardarHistorial = (nuevoTablero) => {
+    setHistorial(h => {
+      const nuevo = [...h, board];
+      historialRef.current = nuevo;
+      return nuevo;
+    });
+  };
+
   // Lógica de input: modo normal y modo notas
   const handleInput = (row, col, value) => {
     if (!board) return;
@@ -106,9 +117,11 @@ export default function TableroSudoku({ sala, socket }) {
             : c
         )
       );
+      guardarHistorial(board.map(fila => fila.map(c => ({ ...c }))));
     } else {
       // Modo normal: solo permite poner número si la celda está vacía o toggle
       if (celda.value === value) {
+        guardarHistorial(board.map(fila => fila.map(c => ({ ...c }))));
         nuevo = board.map((fila, r) =>
           fila.map((c, cidx) =>
             r === row && cidx === col
@@ -117,6 +130,7 @@ export default function TableroSudoku({ sala, socket }) {
           )
         );
       } else if (celda.value === '') {
+        guardarHistorial(board.map(fila => fila.map(c => ({ ...c }))));
         // Elimina notas solo si el movimiento es correcto Y no hay error en el backend
         const esCorrecto = sala.solucion && sala.solucion[row][col].toString() === value;
         nuevo = board.map((fila, r) =>
@@ -136,6 +150,19 @@ export default function TableroSudoku({ sala, socket }) {
     }
     setBoard(nuevo);
     socket.emit('actualizarTablero', { codigo: sala.codigo, board: nuevo });
+  };
+
+  // Deshacer último cambio
+  const handleUndo = () => {
+    if (historialRef.current.length === 0) return;
+    const anterior = historialRef.current[historialRef.current.length - 1];
+    setBoard(anterior);
+    setHistorial(h => {
+      const nuevo = h.slice(0, -1);
+      historialRef.current = nuevo;
+      return nuevo;
+    });
+    socket.emit('actualizarTablero', { codigo: sala.codigo, board: anterior });
   };
 
   // Elimina el número de las notas de la fila, columna y bloque
@@ -191,7 +218,7 @@ export default function TableroSudoku({ sala, socket }) {
         {[1,2,3,4,5,6,7,8,9].map(n => (
           <button key={n} onClick={() => handleButton(n)} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }}>{n}</button>
         ))}
-        <button onClick={handleClear} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }}>⟲</button>
+        <button onClick={handleUndo} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }}>⟲</button>
       </div>
       <div style={{ marginBottom: 8, textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
         Tiempo: {format(tiempo)}
