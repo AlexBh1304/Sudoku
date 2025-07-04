@@ -215,6 +215,9 @@ export default function TableroSudoku({ sala, socket }) {
               const startCol = selected.col !== null ? selected.col - selected.col % 3 : -1;
               const isBlock = selected.row !== null && selected.col !== null &&
                 r >= startRow && r < startRow + 3 && c >= startCol && c < startCol + 3;
+              const isHighlighted = isRow || isCol || isBlock;
+              // Nuevo: celda bloqueada y resaltada
+              const isFixedAndHighlighted = isHighlighted && celda.fixed;
               const style = {
                 width: 36,
                 height: 36,
@@ -237,7 +240,11 @@ export default function TableroSudoku({ sala, socket }) {
                 style.border = `2.5px solid ${sala.color}`;
                 style.zIndex = 2;
                 style.boxShadow = `0 0 0 2px ${sala.color}`;
-              } else if (isRow || isCol || isBlock) {
+              } else if (isFixedAndHighlighted) {
+                // Más opaco/intenso para bloqueadas resaltadas
+                style.background = `${sala.color}cc`;
+                style.boxShadow = `0 0 0 2px ${sala.color}99`;
+              } else if (isHighlighted) {
                 style.background = `${sala.color}22`;
                 style.boxShadow = `0 0 0 2px ${sala.color}33`;
               }
