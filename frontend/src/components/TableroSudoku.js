@@ -218,6 +218,20 @@ export default function TableroSudoku({ sala, socket }) {
     handleInput(selected.row, selected.col, celda.value); // toggle para borrar
   };
 
+  // Manejar desplazamiento con flechas
+  const handleArrow = (e, row, col) => {
+    let newRow = row, newCol = col;
+    if (e.key === 'ArrowUp') newRow = row > 0 ? row - 1 : row;
+    if (e.key === 'ArrowDown') newRow = row < 8 ? row + 1 : row;
+    if (e.key === 'ArrowLeft') newCol = col > 0 ? col - 1 : col;
+    if (e.key === 'ArrowRight') newCol = col < 8 ? col + 1 : col;
+    if (newRow !== row || newCol !== col) {
+      e.preventDefault();
+      const nextInput = document.getElementById(`celda-${newRow}-${newCol}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
   if (!board) return <div>Cargando tablero...</div>;
 
   if (finJuego) {
@@ -321,6 +335,7 @@ export default function TableroSudoku({ sala, socket }) {
                   <input
                     value={celda.value}
                     maxLength={1}
+                    id={`celda-${r}-${c}`}
                     disabled={false} // Permite focus/click en todas las celdas
                     onFocus={() => handleFocus(r, c)}
                     onChange={e => {
@@ -330,6 +345,10 @@ export default function TableroSudoku({ sala, socket }) {
                       handleInput(r, c, val);
                     }}
                     onKeyDown={e => {
+                      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+                        handleArrow(e, r, c);
+                        return;
+                      }
                       if (celda.fixed) {
                         e.preventDefault();
                         return;
