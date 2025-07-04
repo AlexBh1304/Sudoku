@@ -5,6 +5,8 @@ export default function TableroSudoku({ sala, socket }) {
   const [selected, setSelected] = useState({ row: null, col: null });
   const [selecciones, setSelecciones] = useState([]);
   const [errores, setErrores] = useState({});
+  const [tiempoInicio, setTiempoInicio] = useState(null);
+  const [tiempoFinal, setTiempoFinal] = useState(null);
   const [finJuego, setFinJuego] = useState(null);
 
   // Recibe actualizaciones del tablero
@@ -41,14 +43,42 @@ export default function TableroSudoku({ sala, socket }) {
     };
   }, [socket]);
 
-  // Detecta fin de juego
   useEffect(() => {
-    const handleFin = (data) => setFinJuego(data);
+    const handleTemp = (data) => setTiempoInicio(data.inicio);
+    socket.on('temporizador', handleTemp);
+    return () => {
+      socket.off('temporizador', handleTemp);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    const handleFin = (data) => {
+      setFinJuego(data);
+      if (data.tiempo) setTiempoFinal(data.tiempo);
+    };
     socket.on('finJuego', handleFin);
     return () => {
       socket.off('finJuego', handleFin);
     };
   }, [socket]);
+
+  // Temporizador en pantalla
+  const [tiempo, setTiempo] = useState(0);
+  useEffect(() => {
+    if (!tiempoInicio || finJuego) return;
+    const interval = setInterval(() => {
+      setTiempo(Date.now() - tiempoInicio);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [tiempoInicio, finJuego]);
+
+  function format(ms) {
+    if (!ms) return '00:00';
+    const s = Math.floor(ms / 1000);
+    const min = Math.floor(s / 60).toString().padStart(2, '0');
+    const sec = (s % 60).toString().padStart(2, '0');
+    return `${min}:${sec}`;
+  }
 
   // Al seleccionar una celda, notificar a la sala
   const handleFocus = (row, col) => {
@@ -106,6 +136,7 @@ export default function TableroSudoku({ sala, socket }) {
   if (finJuego) {
     return (
       <div style={{ textAlign: 'center', marginTop: 40 }}>
+        <h3>Tiempo final: {format(tiempoFinal)}</h3>
         {finJuego.motivo === 'victoria' ? (
           <h2 style={{ color: 'green' }}>¡Felicidades, completaron el Sudoku!</h2>
         ) : (
@@ -129,6 +160,9 @@ export default function TableroSudoku({ sala, socket }) {
             {nombre}: {err} errores
           </span>
         ))}
+      </div>
+      <div style={{ marginBottom: 8, textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
+        Tiempo: {format(tiempo)}
       </div>
       {board.map((fila, r) => (
         <div key={r} style={{ display: 'flex' }}>

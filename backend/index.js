@@ -34,10 +34,12 @@ io.on('connection', (socket) => {
     sala.tablero = tablero;
     sala.solucion = solucion;
     sala.colores = [color];
+    sala.tiempoInicio = Date.now();
     socket.join(codigo);
     callback({ exito: true, codigo });
     io.to(codigo).emit('salaActualizada', getSala(codigo));
     io.to(codigo).emit('tableroActualizado', sala.tablero);
+    io.to(codigo).emit('temporizador', { inicio: sala.tiempoInicio });
   });
 
   // Unirse a sala
@@ -57,6 +59,7 @@ io.on('connection', (socket) => {
       io.to(codigo).emit('salaActualizada', getSala(codigo));
       const tablero = sala.tablero;
       io.to(codigo).emit('tableroActualizado', tablero);
+      if (sala.tiempoInicio) io.to(codigo).emit('temporizador', { inicio: sala.tiempoInicio });
     } else {
       callback(resultado);
     }
@@ -100,9 +103,11 @@ io.on('connection', (socket) => {
       io.to(codigo).emit('tableroActualizado', board);
       io.to(codigo).emit('erroresActualizados', sala.errores || {});
       if (gameOver) {
-        io.to(codigo).emit('finJuego', { motivo: 'errores' });
+        sala.tiempoFin = Date.now();
+        io.to(codigo).emit('finJuego', { motivo: 'errores', tiempo: sala.tiempoFin - sala.tiempoInicio });
       } else if (victoria) {
-        io.to(codigo).emit('finJuego', { motivo: 'victoria' });
+        sala.tiempoFin = Date.now();
+        io.to(codigo).emit('finJuego', { motivo: 'victoria', tiempo: sala.tiempoFin - sala.tiempoInicio });
       }
     }
   });
