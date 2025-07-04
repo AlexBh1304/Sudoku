@@ -18,7 +18,7 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 3001;
 // Mapa global para rastrear socket.id -> { nombre, codigo }
 const socketToUser = {};
-const COLORES_POSIBLES = ['#e57373','#64b5f6','#81c784','#ffd54f', '#ba68c8', '#ff8a65'];
+const COLORES_POSIBLES = ['#e57373','#64b5f6','#81c784','#ffd54f', '#ba68c8', '#ff8a65', '#ff69b4']; // Se agregó rosa (#ff69b4)
 
 io.on('connection', (socket) => {
   console.log('Nuevo cliente conectado:', socket.id);

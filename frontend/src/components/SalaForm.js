@@ -8,6 +8,7 @@ const colores = [
   '#ffd54f', // amarillo
   '#ba68c8', // morado
   '#ffb74d', // naranja
+  '#ff69b4', // rosa
 ];
 
 const socket = io('http://localhost:3001'); // Cambia la URL al desplegar
