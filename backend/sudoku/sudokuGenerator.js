@@ -39,6 +39,31 @@ function fillBoard(board) {
   return true;
 }
 
+// Contador de soluciones para unicidad
+function countSolutions(board) {
+  let count = 0;
+  function solve(bd) {
+    for (let row = 0; row < 9; row++) {
+      for (let col = 0; col < 9; col++) {
+        if (bd[row][col] === 0) {
+          for (let num = 1; num <= 9; num++) {
+            if (isSafe(bd, row, col, num)) {
+              bd[row][col] = num;
+              solve(bd);
+              bd[row][col] = 0;
+              if (count > 1) return; // Early exit si hay más de una solución
+            }
+          }
+          return;
+        }
+      }
+    }
+    count++;
+  }
+  solve(board.map(row => row.slice()));
+  return count;
+}
+
 function removeCells(board, dificultad) {
   let attempts = dificultad === 'facil' ? 35 : dificultad === 'media' ? 45 : 55;
   let puzzle = board.map(row => row.slice());
@@ -46,8 +71,14 @@ function removeCells(board, dificultad) {
     let row = Math.floor(Math.random() * 9);
     let col = Math.floor(Math.random() * 9);
     if (puzzle[row][col] !== 0) {
+      const backup = puzzle[row][col];
       puzzle[row][col] = 0;
-      attempts--;
+      // Verificar unicidad de solución
+      if (countSolutions(puzzle) !== 1) {
+        puzzle[row][col] = backup; // Si no es única, no quitar
+      } else {
+        attempts--;
+      }
     }
   }
   return puzzle;
