@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import './TableroSudoku.css';
 
 export default function TableroSudoku({ sala, socket }) {
+  // Estado para miembros conectados (debe ir antes de cualquier uso)
+  const [miembros, setMiembros] = useState([]);
   const [board, setBoard] = useState(null);
   const [selected, setSelected] = useState({ row: null, col: null });
   const [selecciones, setSelecciones] = useState([]);
@@ -55,8 +57,15 @@ export default function TableroSudoku({ sala, socket }) {
     };
   }, [socket]);
 
+  // Estado para temporizador contrarreloj
+  const [tiempoLimite, setTiempoLimite] = useState(null);
+
+  // Recibe el tiempo de inicio y límite del backend
   useEffect(() => {
-    const handleTemp = (data) => setTiempoInicio(data.inicio);
+    const handleTemp = (data) => {
+      setTiempoInicio(data.inicio);
+      setTiempoLimite(data.limite || null);
+    };
     socket.on('temporizador', handleTemp);
     return () => {
       socket.off('temporizador', handleTemp);
@@ -74,15 +83,39 @@ export default function TableroSudoku({ sala, socket }) {
     };
   }, [socket]);
 
+  // Estado para saber si el temporizador ya inició
+  const [temporizadorActivo, setTemporizadorActivo] = useState(false);
+
+  // Saber si es anfitrión
+  const esAnfitrion = miembros.length > 0 && miembros[0].nombre === sala.nombre;
+
+  // Nuevo: escuchar evento de inicio de temporizador
+  useEffect(() => {
+    const handleStart = () => setTemporizadorActivo(true);
+    socket.on('iniciarTemporizador', handleStart);
+    return () => socket.off('iniciarTemporizador', handleStart);
+  }, [socket]);
+
+  // Cuando recibimos tiempoInicio, activamos el temporizador
+  useEffect(() => {
+    if (tiempoInicio) setTemporizadorActivo(true);
+  }, [tiempoInicio]);
+
   // Temporizador en pantalla
   const [tiempo, setTiempo] = useState(0);
   useEffect(() => {
-    if (!tiempoInicio || finJuego) return;
+    if (!tiempoInicio || finJuego || !temporizadorActivo) return;
     const interval = setInterval(() => {
       setTiempo(Date.now() - tiempoInicio);
     }, 1000);
     return () => clearInterval(interval);
-  }, [tiempoInicio, finJuego]);
+  }, [tiempoInicio, finJuego, temporizadorActivo]);
+
+  // Calcula tiempo restante y porcentaje si es contrarreloj
+  const esContrarreloj = salaLocal.modo === 'contrarreloj';
+  const tiempoRestante = esContrarreloj && tiempoLimite ? Math.max(0, tiempoLimite - Date.now()) : null;
+  const tiempoTotal = esContrarreloj && tiempoLimite && tiempoInicio ? tiempoLimite - tiempoInicio : null;
+  const porcentaje = esContrarreloj && tiempoTotal ? Math.max(0, Math.min(100, 100 * (tiempoRestante / tiempoTotal))) : null;
 
   function format(ms) {
     if (!ms) return '00:00';
@@ -349,13 +382,18 @@ export default function TableroSudoku({ sala, socket }) {
       setDificultadActual(dificultad); // <-- actualizar dificultad visible
       setSalaLocal(prev => ({ ...prev, dificultad, modo })); // <-- actualizar ambos siempre
       setReiniciando(false);
+      // Resetear temporizador
+      setTemporizadorActivo(false);
+      setTiempoInicio(null);
+      setTiempoLimite(null);
+      setTiempo(0);
     };
     socket.on('partidaReiniciada', handler);
     return () => socket.off('partidaReiniciada', handler);
   }, [socket]);
 
-  // Estado para miembros conectados
-  const [miembros, setMiembros] = useState([]);
+  // Estado para miembros conectados (debe ir antes de cualquier uso)
+  // const [miembros, setMiembros] = useState([]); // Eliminado duplicado
   useEffect(() => {
     const handleSala = (salaActualizada) => {
       setMiembros(salaActualizada.jugadores || []);
@@ -378,6 +416,8 @@ export default function TableroSudoku({ sala, socket }) {
         <h3>Tiempo final: {format(tiempoFinal)}</h3>
         {finJuego.motivo === 'victoria' ? (
           <h2 style={{ color: 'green' }}>¡Felicidades, completaron el Sudoku!</h2>
+        ) : finJuego.motivo === 'tiempo' ? (
+          <h2 style={{ color: '#e65100' }}>¡Tiempo agotado! Se terminó la partida.</h2>
         ) : (
           <h2 style={{ color: 'red' }}>¡Juego terminado por errores!</h2>
         )}
@@ -466,7 +506,38 @@ export default function TableroSudoku({ sala, socket }) {
             <button onClick={handleUndo} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }} title="Deshacer (U)">⟲</button>
           </div>
           <div style={{ marginBottom: 8, textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
-            Tiempo: {format(tiempo)}
+            {esContrarreloj ? (
+              <div style={{ position: 'relative', width: 220, margin: '0 auto' }}>
+                {!temporizadorActivo && esAnfitrion && (
+                  <button style={{ marginBottom: 8, background: '#4caf50', color: '#fff', fontWeight: 'bold', border: 'none', borderRadius: 6, padding: '6px 18px', fontSize: 16 }}
+                    onClick={() => socket.emit('iniciarTemporizador', { codigo: sala.codigo })}>
+                    Iniciar partida
+                  </button>
+                )}
+                {!temporizadorActivo && !esAnfitrion && (
+                  <div style={{ marginBottom: 8, color: '#888', fontWeight: 'normal' }}>
+                    Esperando a que el anfitrión inicie la partida...
+                  </div>
+                )}
+                {temporizadorActivo && (
+                  <>
+                    <div style={{ height: 18, background: '#eee', borderRadius: 8, overflow: 'hidden', border: '1.5px solid #bbb', marginBottom: 2 }}>
+                      <div style={{
+                        width: `${porcentaje}%`,
+                        height: '100%',
+                        background: porcentaje > 33 ? (porcentaje > 66 ? '#81c784' : '#ffd54f') : '#e57373',
+                        transition: 'width 0.5s',
+                      }} />
+                    </div>
+                    <span style={{ fontWeight: 'bold', color: porcentaje <= 20 ? '#e53935' : '#333' }}>
+                      Tiempo restante: {format(tiempoRestante)} / {format(tiempoTotal)}
+                    </span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <>Tiempo: {format(tiempo)}</>
+            )}
           </div>
           <div style={{ marginBottom: 8, textAlign: 'center' }}>
             {Object.entries(errores).map(([nombre, err]) => (
