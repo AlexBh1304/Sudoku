@@ -4,6 +4,7 @@ export default function TableroSudoku({ sala, socket }) {
   const [board, setBoard] = useState(null);
   const [selected, setSelected] = useState({ row: null, col: null });
   const [selecciones, setSelecciones] = useState([]);
+  const [modoNotas, setModoNotas] = useState(false);
   const [errores, setErrores] = useState({});
   const [tiempoInicio, setTiempoInicio] = useState(null);
   const [tiempoFinal, setTiempoFinal] = useState(null);
@@ -86,36 +87,67 @@ export default function TableroSudoku({ sala, socket }) {
     socket.emit('seleccionarCelda', { codigo: sala.codigo, row, col });
   };
 
-  // Enviar cambios al backend
+  // Lógica de input: modo normal y modo notas
   const handleInput = (row, col, value) => {
     if (!board) return;
     const celda = board[row][col];
     if (celda.fixed) return;
     if (!/^[1-9]$/.test(value)) return;
-    // Toggle: si ya hay un número, solo se borra si es el mismo
     let nuevo;
-    if (celda.value === value) {
+    if (modoNotas) {
+      // Modo notas: toggle el número en el array de notas
+      const notas = celda.notas || [];
+      const idx = notas.indexOf(value);
+      const nuevasNotas = idx === -1 ? [...notas, value].sort() : notas.filter(n => n !== value);
       nuevo = board.map((fila, r) =>
         fila.map((c, cidx) =>
           r === row && cidx === col
-            ? { ...c, value: '', color: null }
-            : c
-        )
-      );
-    } else if (celda.value === '') {
-      nuevo = board.map((fila, r) =>
-        fila.map((c, cidx) =>
-          r === row && cidx === col
-            ? { ...c, value, color: sala.color }
+            ? { ...c, notas: nuevasNotas }
             : c
         )
       );
     } else {
-      return; // No permite reemplazar
+      // Modo normal: solo permite poner número si la celda está vacía o toggle
+      if (celda.value === value) {
+        nuevo = board.map((fila, r) =>
+          fila.map((c, cidx) =>
+            r === row && cidx === col
+              ? { ...c, value: '', color: null }
+              : c
+          )
+        );
+      } else if (celda.value === '') {
+        nuevo = board.map((fila, r) =>
+          fila.map((c, cidx) =>
+            r === row && cidx === col
+              ? { ...c, value, color: sala.color, notas: [] }
+              : c
+          )
+        );
+        // Elimina ese número de las notas de la fila, columna y bloque
+        nuevo = eliminarNotas(nuevo, row, col, value);
+      } else {
+        return;
+      }
     }
     setBoard(nuevo);
     socket.emit('actualizarTablero', { codigo: sala.codigo, board: nuevo });
   };
+
+  // Elimina el número de las notas de la fila, columna y bloque
+  function eliminarNotas(tablero, row, col, value) {
+    const nuevo = tablero.map(fila => fila.map(c => ({ ...c })));
+    for (let i = 0; i < 9; i++) {
+      if (nuevo[row][i].notas) nuevo[row][i].notas = nuevo[row][i].notas.filter(n => n !== value);
+      if (nuevo[i][col].notas) nuevo[i][col].notas = nuevo[i][col].notas.filter(n => n !== value);
+    }
+    const startRow = row - row % 3, startCol = col - col % 3;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+      const r = startRow + i, c = startCol + j;
+      if (nuevo[r][c].notas) nuevo[r][c].notas = nuevo[r][c].notas.filter(n => n !== value);
+    }
+    return nuevo;
+  }
 
   // Botones del 1 al 9
   const handleButton = (num) => {
@@ -149,6 +181,9 @@ export default function TableroSudoku({ sala, socket }) {
   return (
     <div style={{ display: 'inline-block', border: '2px solid #333', marginTop: 24 }}>
       <div style={{ marginBottom: 8, textAlign: 'center' }}>
+        <button onClick={() => setModoNotas(m => !m)} style={{ marginRight: 8, background: modoNotas ? '#ffd54f' : '#eee', fontWeight: 'bold' }}>
+          {modoNotas ? 'Modo Notas: ON' : 'Modo Notas: OFF'}
+        </button>
         {[1,2,3,4,5,6,7,8,9].map(n => (
           <button key={n} onClick={() => handleButton(n)} style={{ width: 36, height: 36, margin: 2, fontSize: 18 }}>{n}</button>
         ))}
@@ -167,40 +202,62 @@ export default function TableroSudoku({ sala, socket }) {
       {board.map((fila, r) => (
         <div key={r} style={{ display: 'flex' }}>
           {fila.map((celda, c) => (
-            <input
-              key={c}
-              value={celda.value}
-              maxLength={1}
-              disabled={celda.fixed}
-              onFocus={() => handleFocus(r, c)}
-              onChange={e => {
-                const val = e.target.value.replace(/[^1-9]/, '');
-                if (!val) return;
-                handleInput(r, c, val);
-              }}
-              onKeyDown={e => {
-                if (/^[1-9]$/.test(e.key)) {
-                  e.preventDefault();
-                  handleInput(r, c, e.key);
-                } else if (e.key === 'Backspace' || e.key === 'Delete') {
-                  e.preventDefault();
-                  if (!celda.fixed && celda.value !== '') handleInput(r, c, celda.value);
-                }
-              }}
-              style={{
-                width: 36,
-                height: 36,
-                textAlign: 'center',
-                fontSize: 20,
-                border: selected.row === r && selected.col === c ? `2.5px solid ${sala.color}` :
-                  (selecciones.some(s => s.row === r && s.col === c) ? `2px solid ${selecciones.find(s => s.row === r && s.col === c).color}` : '1px solid #aaa'),
-                background: celda.fixed ? '#eee' : (celda.color || '#fff'),
-                outline: 'none',
-                fontWeight: celda.fixed ? 'bold' : 'normal',
-                cursor: celda.fixed ? 'not-allowed' : 'pointer',
-              }}
-              readOnly={false}
-            />
+            <div key={c} style={{ position: 'relative' }}>
+              <input
+                value={celda.value}
+                maxLength={1}
+                disabled={celda.fixed}
+                onFocus={() => handleFocus(r, c)}
+                onChange={e => {
+                  const val = e.target.value.replace(/[^1-9]/, '');
+                  if (!val) return;
+                  handleInput(r, c, val);
+                }}
+                onKeyDown={e => {
+                  if (/^[1-9]$/.test(e.key)) {
+                    e.preventDefault();
+                    handleInput(r, c, e.key);
+                  } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                    e.preventDefault();
+                    if (!celda.fixed && celda.value !== '') handleInput(r, c, celda.value);
+                  }
+                }}
+                style={{
+                  width: 36,
+                  height: 36,
+                  textAlign: 'center',
+                  fontSize: 20,
+                  border: selected.row === r && selected.col === c ? `2.5px solid ${sala.color}` :
+                    (selecciones.some(s => s.row === r && s.col === c) ? `2px solid ${selecciones.find(s => s.row === r && s.col === c).color}` : '1px solid #aaa'),
+                  background: celda.fixed ? '#eee' : (celda.color || '#fff'),
+                  outline: 'none',
+                  fontWeight: celda.fixed ? 'bold' : 'normal',
+                  cursor: celda.fixed ? 'not-allowed' : 'pointer',
+                }}
+                readOnly={false}
+              />
+              {/* Notas en la celda */}
+              {!celda.value && celda.notas && celda.notas.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: 2,
+                  left: 2,
+                  width: 32,
+                  height: 32,
+                  fontSize: 10,
+                  color: '#888',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  pointerEvents: 'none',
+                }}>
+                  {Array(9).fill(0).map((_, i) => (
+                    <div key={i} style={{ width: '33%', height: '33%', textAlign: 'center' }}>
+                      {celda.notas.includes((i+1).toString()) ? (i+1) : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       ))}
