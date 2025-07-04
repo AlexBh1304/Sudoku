@@ -245,8 +245,9 @@ export default function TableroSudoku({ sala, socket }) {
                 style.background = `${sala.color}cc`;
                 style.boxShadow = `0 0 0 2px ${sala.color}99`;
               } else if (isHighlighted) {
-                style.background = `${sala.color}22`;
-                style.boxShadow = `0 0 0 2px ${sala.color}33`;
+                // Más oscuro para resaltado normal (no bloqueadas)
+                style.background = `${sala.color}55`;
+                style.boxShadow = `0 0 0 2px ${sala.color}44`;
               }
               if (selecciones.some(s => s.row === r && s.col === c)) {
                 const colorOtro = selecciones.find(s => s.row === r && s.col === c).color;
