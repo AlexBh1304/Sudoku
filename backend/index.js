@@ -24,12 +24,13 @@ io.on('connection', (socket) => {
   console.log('Nuevo cliente conectado:', socket.id);
 
   // Crear sala
-  socket.on('crearSala', ({ nombre, color, dificultad }, callback) => {
-    const codigo = crearSala(nombre, dificultad);
+  socket.on('crearSala', ({ nombre, color, dificultad, modo }, callback) => {
+    const codigo = crearSala(nombre, dificultad, modo); // pasa modo
     setJugadorId(codigo, nombre, socket.id);
     const sala = getSala(codigo);
     if (sala && sala.jugadores.length > 0) sala.jugadores[0].color = color;
     sala.dificultad = dificultad;
+    sala.modo = modo || 'clasico'; // asegura que el modo esté presente
     // Generar tablero y solución
     const { tablero, solucion } = generarSudoku(dificultad);
     sala.tablero = tablero;
@@ -189,20 +190,21 @@ io.on('connection', (socket) => {
   });
 
   // Nuevo: reiniciar partida en la misma sala
-  socket.on('reiniciarPartida', ({ codigo, dificultad }) => {
+  socket.on('reiniciarPartida', ({ codigo, dificultad, modo }) => {
     const sala = getSala(codigo);
     if (!sala) return;
     const { tablero, solucion } = generarSudoku(dificultad);
     sala.tablero = tablero;
     sala.solucion = solucion;
     sala.dificultad = dificultad;
+    if (modo) sala.modo = modo; // permite cambiar el modo al reiniciar
     sala.errores = {};
     sala.tiempoInicio = Date.now();
     sala.tiempoFin = null;
     io.to(codigo).emit('tableroActualizado', sala.tablero);
     io.to(codigo).emit('erroresActualizados', sala.errores);
     io.to(codigo).emit('temporizador', { inicio: sala.tiempoInicio });
-    io.to(codigo).emit('partidaReiniciada', { dificultad });
+    io.to(codigo).emit('partidaReiniciada', { dificultad, modo: sala.modo }); // <-- ahora también envía el modo
   });
 
   // Permitir que el frontend solicite la info de la sala

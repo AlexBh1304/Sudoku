@@ -13,6 +13,14 @@ export default function TableroSudoku({ sala, socket }) {
   const [historial, setHistorial] = useState([]); // Historial global de tableros
   const historialRef = useRef([]);
 
+  // Estado local para la sala (sincroniza modo y dificultad)
+  const [salaLocal, setSalaLocal] = useState(sala);
+
+  // Sincroniza salaLocal si cambia la prop sala (por navegación o recarga)
+  useEffect(() => {
+    setSalaLocal(sala);
+  }, [sala]);
+
   // Recibe actualizaciones del tablero
   useEffect(() => {
     const handleTablero = (nuevoTablero) => {
@@ -324,14 +332,14 @@ export default function TableroSudoku({ sala, socket }) {
   // Estado para dificultad actual (para mostrar en la esquina)
   const [dificultadActual, setDificultadActual] = useState(sala.dificultad || 'facil');
   useEffect(() => {
-    setDificultadActual(sala.dificultad || 'facil');
-  }, [sala.dificultad]);
+    setDificultadActual(salaLocal.dificultad || 'facil');
+  }, [salaLocal.dificultad]);
   // Hooks para reinicio de partida (deben ir fuera de condicionales)
   const [dificultadNueva, setDificultadNueva] = useState(sala.dificultad || 'facil');
   const [reiniciando, setReiniciando] = useState(false);
   useEffect(() => {
-    // Actualizar dificultad al reiniciar partida
-    const handler = ({ dificultad }) => {
+    // Actualizar dificultad y modo al reiniciar partida
+    const handler = ({ dificultad, modo }) => {
       setFinJuego(null);
       setTiempoFinal(null);
       setHistorial([]);
@@ -339,6 +347,7 @@ export default function TableroSudoku({ sala, socket }) {
       setMultiSelect([]);
       setDificultadNueva(dificultad);
       setDificultadActual(dificultad); // <-- actualizar dificultad visible
+      setSalaLocal(prev => ({ ...prev, dificultad, modo })); // <-- actualizar ambos siempre
       setReiniciando(false);
     };
     socket.on('partidaReiniciada', handler);
@@ -350,6 +359,8 @@ export default function TableroSudoku({ sala, socket }) {
   useEffect(() => {
     const handleSala = (salaActualizada) => {
       setMiembros(salaActualizada.jugadores || []);
+      // Actualiza salaLocal con los datos más recientes (incluye modo y dificultad)
+      setSalaLocal(prev => ({ ...prev, ...salaActualizada }));
     };
     socket.on('salaActualizada', handleSala);
     // Solicitar info de sala al entrar
@@ -387,10 +398,15 @@ export default function TableroSudoku({ sala, socket }) {
               <option value="media">Media</option>
               <option value="dificil">Difícil</option>
             </select>
+            <label style={{ marginLeft: 16 }}>Modo: </label>
+            <select value={salaLocal.modo || 'clasico'} onChange={e => setSalaLocal(prev => ({ ...prev, modo: e.target.value }))}>
+              <option value="clasico">Clásico</option>
+              <option value="contrarreloj">Contrarreloj</option>
+            </select>
             <button disabled={reiniciando} style={{ marginLeft: 12, padding: '6px 18px', fontWeight: 'bold', borderRadius: 6, background: '#4caf50', color: '#fff', border: 'none', fontSize: 16 }}
               onClick={() => {
                 setReiniciando(true);
-                socket.emit('reiniciarPartida', { codigo: sala.codigo, dificultad: dificultadNueva });
+                socket.emit('reiniciarPartida', { codigo: sala.codigo, dificultad: dificultadNueva, modo: salaLocal.modo || 'clasico' });
               }}>
               Iniciar nueva partida
             </button>
@@ -404,16 +420,16 @@ export default function TableroSudoku({ sala, socket }) {
     <div style={{ display: 'flex', flexDirection: 'row' }}>
       {/* Esquina superior derecha: código de sala y modo */}
       <div style={{ position: 'fixed', top: 18, right: 24, zIndex: 10, background: '#fff', border: '2px solid #333', borderRadius: 8, padding: '8px 18px', boxShadow: '0 2px 8px #0002', fontSize: 15, fontWeight: 'bold', color: '#333', minWidth: 120, textAlign: 'right' }}>
-        <div>Código: <span style={{ fontFamily: 'monospace', letterSpacing: 1 }}>{sala.codigo}</span></div>
+        <div>Código: <span style={{ fontFamily: 'monospace', letterSpacing: 1 }}>{salaLocal.codigo}</span></div>
         <div>Dificultad: <span style={{ textTransform: 'capitalize' }}>{dificultadActual}</span></div>
-        <div style={{ fontWeight: 400, fontSize: 14, marginTop: 4 }}>Modo: <span style={{ textTransform: 'capitalize' }}>{sala.modo || 'clásico'}</span></div>
+        <div style={{ fontWeight: 400, fontSize: 14, marginTop: 4 }}>Modo: <span style={{ textTransform: 'capitalize' }}>{salaLocal.modo || 'clásico'}</span></div>
       </div>
       {/* Lateral de miembros */}
       <div style={{ minWidth: 180, borderRight: '2px solid #eee', padding: 16, background: '#fafafa', height: '100%' }}>
         <h4>Miembros</h4>
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {miembros.map((j, idx) => (
-            <li key={j.nombre} style={{ marginBottom: 8, fontWeight: sala.jugadores?.[0]?.nombre === j.nombre ? 'bold' : 'normal', color: j.color || '#333', fontSize: 14 }}>
+            <li key={j.nombre} style={{ marginBottom: 8, fontWeight: salaLocal.jugadores?.[0]?.nombre === j.nombre ? 'bold' : 'normal', color: j.color || '#333', fontSize: 14 }}>
               {j.nombre} {idx === 0 ? <span style={{ fontSize: 12, color: '#888' }}>(anfitrión)</span> : ''}
               <div style={{ fontSize: 11, color: '#888', marginLeft: 4 }}>
                 <span style={{ fontFamily: 'monospace' }}>id: {j.id || 'sin id'}</span>

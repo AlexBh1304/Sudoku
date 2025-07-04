@@ -20,6 +20,7 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
   const [modo, setModo] = useState('crear');
   const [mensaje, setMensaje] = useState('');
   const [dificultad, setDificultad] = useState('facil');
+  const [modoJuego, setModoJuego] = useState('clasico');
 
   // Si recibimos un código por props, prellenar el campo y cambiar a modo unirse
   React.useEffect(() => {
@@ -32,9 +33,9 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
   const handleCrear = (e) => {
     e.preventDefault();
     if (!nombre) return setMensaje('Pon tu nombre');
-    socket.emit('crearSala', { nombre, color, dificultad }, (res) => {
+    socket.emit('crearSala', { nombre, color, dificultad, modo: modoJuego }, (res) => {
       if (res.exito) {
-        onSalaEntrar({ codigo: res.codigo, nombre, color, dificultad, socket });
+        onSalaEntrar({ codigo: res.codigo, nombre, color, dificultad, modo: modoJuego, socket });
       } else {
         setMensaje('Error al crear sala');
       }
@@ -99,6 +100,15 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
               <option value="facil">Fácil</option>
               <option value="media">Media</option>
               <option value="dificil">Difícil</option>
+            </select>
+          </div>
+        )}
+        {modo === 'crear' && (
+          <div style={{ marginBottom: 8 }}>
+            <span>Modo: </span>
+            <select value={modoJuego} onChange={e => setModoJuego(e.target.value)}>
+              <option value="clasico">Clásico</option>
+              <option value="contrarreloj">Contrarreloj</option>
             </select>
           </div>
         )}
