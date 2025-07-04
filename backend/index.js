@@ -25,6 +25,11 @@ io.on('connection', (socket) => {
 
   // Crear sala
   socket.on('crearSala', ({ nombre, color, dificultad, modo }, callback) => {
+    // Protección: si el socket ya tiene una sala, no crear otra
+    if (socketToUser[socket.id] && socketToUser[socket.id].codigo) {
+      callback({ exito: false, mensaje: 'Ya tienes una sala activa.' });
+      return;
+    }
     const codigo = crearSala(nombre, dificultad, modo); // pasa modo
     setJugadorId(codigo, nombre, socket.id);
     const sala = getSala(codigo);
@@ -230,6 +235,11 @@ io.on('connection', (socket) => {
 
   // Al crear sala, también configura tiempoLimite si es contrarreloj
   socket.on('crearSala', ({ nombre, color, dificultad, modo }, callback) => {
+    // Protección: si el socket ya tiene una sala, no crear otra
+    if (socketToUser[socket.id] && socketToUser[socket.id].codigo) {
+      callback({ exito: false, mensaje: 'Ya tienes una sala activa.' });
+      return;
+    }
     const codigo = crearSala(nombre, dificultad, modo);
     setJugadorId(codigo, nombre, socket.id);
     const sala = getSala(codigo);
@@ -254,6 +264,40 @@ io.on('connection', (socket) => {
     console.log(`[SALA] Jugadores en sala ${codigo}:`, sala.jugadores.map(j => `${j.nombre} (${j.id || 'sin id'})`).join(', '));
     console.log(`[SALA] Colores usados: ${sala.colores.join(', ')}`);
     console.log(`[SALA] Colores disponibles: ${COLORES_POSIBLES.filter(c => !sala.colores.includes(c)).join(', ')}`);
+  });
+
+  // --- LOGS Y LIMPIEZA AL DESCONECTAR USUARIO ---
+  socket.on('disconnect', () => {
+    const user = socketToUser[socket.id];
+    if (!user) return;
+    const { nombre, codigo } = user;
+    const sala = getSala(codigo);
+    let color = null;
+    if (sala) {
+      // Buscar color del jugador
+      const jugador = sala.jugadores.find(j => j.id === socket.id);
+      color = jugador ? jugador.color : null;
+      // Eliminar jugador de la sala
+      eliminarJugadorPorId(codigo, socket.id);
+      // Eliminar color de la lista de colores usados
+      if (color && sala.colores) {
+        sala.colores = sala.colores.filter(c => c !== color);
+      }
+      // Log de desconexión
+      console.log(`[DESCONECTADO] ${nombre} (${color || 'sin color'}) [${socket.id}] de la sala ${codigo}`);
+      if (sala.jugadores.length === 0) {
+        // Eliminar sala si está vacía
+        delete salas[codigo];
+        console.log(`[SALA] Sala ${codigo} eliminada por estar vacía.`);
+      } else {
+        io.to(codigo).emit('salaActualizada', getSala(codigo));
+        console.log(`[SALA] Jugadores restantes en sala ${codigo}:`, sala.jugadores.map(j => `${j.nombre} (${j.id || 'sin id'})`).join(', '));
+        console.log(`[SALA] Colores usados: ${sala.colores.join(', ')}`);
+        console.log(`[SALA] Colores disponibles: ${COLORES_POSIBLES.filter(c => !sala.colores.includes(c)).join(', ')}`);
+      }
+    }
+    // Limpiar socketToUser
+    delete socketToUser[socket.id];
   });
 
 });

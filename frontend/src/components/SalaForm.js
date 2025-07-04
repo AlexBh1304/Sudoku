@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { io } from 'socket.io-client';
 
 const colores = [
   '#e57373', // rojo
@@ -11,9 +10,7 @@ const colores = [
   '#ff69b4', // rosa
 ];
 
-const socket = io('http://localhost:3001'); // Cambia la URL al desplegar
-
-export default function SalaForm({ onSalaEntrar, codigoURL }) {
+export default function SalaForm({ onSalaEntrar, codigoURL, socket }) {
   const [nombre, setNombre] = useState('');
   const [codigo, setCodigo] = useState('');
   const [color, setColor] = useState(colores[0]);
@@ -21,6 +18,7 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
   const [mensaje, setMensaje] = useState('');
   const [dificultad, setDificultad] = useState('facil');
   const [modoJuego, setModoJuego] = useState('clasico');
+  const [creando, setCreando] = useState(false);
 
   // Si recibimos un código por props, prellenar el campo y cambiar a modo unirse
   React.useEffect(() => {
@@ -32,8 +30,16 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
 
   const handleCrear = (e) => {
     e.preventDefault();
-    if (!nombre) return setMensaje('Pon tu nombre');
+    if (creando) return;
+    setCreando(true);
+    setMensaje('');
+    if (!nombre) {
+      setMensaje('Pon tu nombre');
+      setCreando(false);
+      return;
+    }
     socket.emit('crearSala', { nombre, color, dificultad, modo: modoJuego }, (res) => {
+      setCreando(false);
       if (res.exito) {
         onSalaEntrar({ codigo: res.codigo, nombre, color, dificultad, modo: modoJuego, socket });
       } else {
@@ -112,11 +118,11 @@ export default function SalaForm({ onSalaEntrar, codigoURL }) {
             </select>
           </div>
         )}
-        <button type="submit" style={{ width: '100%', marginBottom: 8 }}>
-          {modo === 'crear' ? 'Crear y entrar' : 'Unirse'}
+        <button type="submit" style={{ width: '100%', marginBottom: 8 }} disabled={creando}>
+          {modo === 'crear' ? (creando ? 'Creando...' : 'Crear y entrar') : 'Unirse'}
         </button>
       </form>
-      <button onClick={() => setModo(modo === 'crear' ? 'unirse' : 'crear')} style={{ width: '100%' }}>
+      <button onClick={() => { setModo(modo === 'crear' ? 'unirse' : 'crear'); setMensaje(''); setCreando(false); }} style={{ width: '100%' }}>
         {modo === 'crear' ? '¿Ya tienes código? Unirse' : '¿No tienes código? Crear sala'}
       </button>
       {mensaje && <div style={{ color: 'red', marginTop: 8 }}>{mensaje}</div>}

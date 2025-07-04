@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import logo from './logo.svg';
 import './App.css';
 import SalaForm from './components/SalaForm';
 import TableroSudoku from './components/TableroSudoku';
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3001'); // Socket global para toda la app
 
 function App() {
   const [sala, setSala] = useState(null);
+  const salaCreada = useRef(false);
 
   // Detectar si hay ?sala= en la URL
   useEffect(() => {
@@ -16,9 +20,16 @@ function App() {
     }
   }, []);
 
+  // Wrapper para evitar doble creación
+  const handleSalaEntrar = (data) => {
+    if (salaCreada.current) return;
+    salaCreada.current = true;
+    setSala(data);
+  };
+
   if (!sala || !sala.nombre) {
     // Si hay código en la URL, prellenar el campo en SalaForm
-    return <SalaForm onSalaEntrar={setSala} codigoURL={sala?.codigo} />;
+    return <SalaForm onSalaEntrar={handleSalaEntrar} codigoURL={sala?.codigo} socket={socket} />;
   }
 
   return (
@@ -32,7 +43,7 @@ function App() {
         readOnly
         onFocus={e => e.target.select()}
       />
-      <TableroSudoku sala={sala} socket={sala.socket} />
+      <TableroSudoku sala={sala} socket={socket} />
     </div>
   );
 }
