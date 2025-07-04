@@ -117,6 +117,8 @@ export default function TableroSudoku({ sala, socket }) {
           )
         );
       } else if (celda.value === '') {
+        // Elimina notas solo si el movimiento es correcto Y no hay error en el backend
+        const esCorrecto = sala.solucion && sala.solucion[row][col].toString() === value;
         nuevo = board.map((fila, r) =>
           fila.map((c, cidx) =>
             r === row && cidx === col
@@ -124,8 +126,10 @@ export default function TableroSudoku({ sala, socket }) {
               : c
           )
         );
-        // Elimina ese número de las notas de la fila, columna y bloque
-        nuevo = eliminarNotas(nuevo, row, col, value);
+        // Espera confirmación del backend antes de eliminar notas
+        setBoard(nuevo);
+        socket.emit('actualizarTablero', { codigo: sala.codigo, board: nuevo, eliminarNotas: esCorrecto });
+        return;
       } else {
         return;
       }

@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const { crearSala, unirseSala, getSala, setJugadorId, getOrCreateTablero } = require('./sala/salaManager');
 const { generarSudoku } = require('./sudoku/sudokuGenerator');
 const { checkMove } = require('./sudoku/sudokuChecker');
+const { eliminarNotasTablero } = require('./sudoku/utilsNotas');
 
 const app = express();
 const server = http.createServer(app);
@@ -79,10 +80,10 @@ io.on('connection', (socket) => {
           }
         }
       }
-      // Verifica con la solución y reglas de Sudoku
       let error = false;
       let gameOver = false;
       let victoria = false;
+      let nuevoTablero = board;
       if (value && row !== -1 && col !== -1 && sala.solucion) {
         const correcto = sala.solucion[row][col].toString() === value;
         const unico = checkMove(board, row, col, value);
@@ -94,13 +95,16 @@ io.on('connection', (socket) => {
           if (error) sala.errores[jugador.nombre]++;
           if (sala.errores[jugador.nombre] >= 3) gameOver = true;
         }
+        // Si es correcto y único, elimina notas en todo el tablero
+        if (correcto && !error) {
+          nuevoTablero = eliminarNotasTablero(board, row, col, value);
+        }
       }
-      sala.tablero = board;
-      // Verificar victoria
-      if (sala.solucion && board.every((fila, r) => fila.every((celda, c) => celda.value === sala.solucion[r][c].toString()))) {
+      sala.tablero = nuevoTablero;
+      if (sala.solucion && nuevoTablero.every((fila, r) => fila.every((celda, c) => celda.value === sala.solucion[r][c].toString()))) {
         victoria = true;
       }
-      io.to(codigo).emit('tableroActualizado', board);
+      io.to(codigo).emit('tableroActualizado', nuevoTablero);
       io.to(codigo).emit('erroresActualizados', sala.errores || {});
       if (gameOver) {
         sala.tiempoFin = Date.now();
