@@ -167,6 +167,31 @@ io.on('connection', (socket) => {
     io.to(codigo).emit('celdaSeleccionada', { row, col, color: jugador.color, nombre: jugador.nombre });
   });
 
+  // Nuevo: reiniciar partida en la misma sala
+  socket.on('reiniciarPartida', ({ codigo, dificultad }) => {
+    const sala = getSala(codigo);
+    if (!sala) return;
+    const { tablero, solucion } = generarSudoku(dificultad);
+    sala.tablero = tablero;
+    sala.solucion = solucion;
+    sala.dificultad = dificultad;
+    sala.errores = {};
+    sala.tiempoInicio = Date.now();
+    sala.tiempoFin = null;
+    io.to(codigo).emit('tableroActualizado', sala.tablero);
+    io.to(codigo).emit('erroresActualizados', sala.errores);
+    io.to(codigo).emit('temporizador', { inicio: sala.tiempoInicio });
+    io.to(codigo).emit('partidaReiniciada', { dificultad });
+  });
+
+  // Permitir que el frontend solicite la info de la sala
+  socket.on('solicitarSala', ({ codigo }) => {
+    const sala = getSala(codigo);
+    if (sala) {
+      io.to(codigo).emit('salaActualizada', sala);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('Cliente desconectado:', socket.id);
     // Aquí irá la lógica para limpiar salas si es necesario

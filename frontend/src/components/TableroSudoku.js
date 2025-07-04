@@ -310,9 +310,40 @@ export default function TableroSudoku({ sala, socket }) {
     return () => window.removeEventListener('keydown', handleGlobalKey);
   }, [finJuego, handleUndo, handleClear]);
 
+  // Hooks para reinicio de partida (deben ir fuera de condicionales)
+  const [dificultadNueva, setDificultadNueva] = useState(sala.dificultad || 'facil');
+  const [reiniciando, setReiniciando] = useState(false);
+  useEffect(() => {
+    const handler = ({ dificultad }) => {
+      setFinJuego(null);
+      setTiempoFinal(null);
+      setHistorial([]);
+      setModoNotas(false);
+      setMultiSelect([]);
+      setDificultadNueva(dificultad);
+      setReiniciando(false);
+    };
+    socket.on('partidaReiniciada', handler);
+    return () => socket.off('partidaReiniciada', handler);
+  }, [socket]);
+
+  // Estado para miembros conectados
+  const [miembros, setMiembros] = useState([]);
+  useEffect(() => {
+    const handleSala = (salaActualizada) => {
+      setMiembros(salaActualizada.jugadores || []);
+    };
+    socket.on('salaActualizada', handleSala);
+    // Solicitar info de sala al entrar
+    socket.emit('solicitarSala', { codigo: sala.codigo });
+    return () => socket.off('salaActualizada', handleSala);
+  }, [socket, sala.codigo]);
+
   if (!board) return <div>Cargando tablero...</div>;
 
   if (finJuego) {
+    // Mostrar resumen y opción de reinicio si es anfitrión
+    const esAnfitrion = sala.esAnfitrion || sala.jugadores?.[0]?.nombre === sala.nombre;
     return (
       <div style={{ textAlign: 'center', marginTop: 40 }}>
         <h3>Tiempo final: {format(tiempoFinal)}</h3>
@@ -321,160 +352,202 @@ export default function TableroSudoku({ sala, socket }) {
         ) : (
           <h2 style={{ color: 'red' }}>¡Juego terminado por errores!</h2>
         )}
+        <div style={{ margin: '24px 0' }}>
+          <h4>Resumen de la partida:</h4>
+          <ul style={{ display: 'inline-block', textAlign: 'left' }}>
+            {Object.entries(errores).map(([nombre, err]) => (
+              <li key={nombre}>{nombre}: {err} errores</li>
+            ))}
+          </ul>
+        </div>
+        {esAnfitrion && (
+          <div style={{ marginTop: 24 }}>
+            <h4>¿Jugar otra partida en esta sala?</h4>
+            <label>Dificultad: </label>
+            <select value={dificultadNueva} onChange={e => setDificultadNueva(e.target.value)}>
+              <option value="facil">Fácil</option>
+              <option value="media">Media</option>
+              <option value="dificil">Difícil</option>
+            </select>
+            <button disabled={reiniciando} style={{ marginLeft: 12, padding: '6px 18px', fontWeight: 'bold', borderRadius: 6, background: '#4caf50', color: '#fff', border: 'none', fontSize: 16 }}
+              onClick={() => {
+                setReiniciando(true);
+                socket.emit('reiniciarPartida', { codigo: sala.codigo, dificultad: dificultadNueva });
+              }}>
+              Iniciar nueva partida
+            </button>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'inline-block', border: '3px solid #333', marginTop: 24, background: '#fafafa', borderRadius: 10, boxShadow: '0 2px 12px #0002', padding: 16 }}>
-      <div style={{ marginBottom: 8, textAlign: 'center' }}>
-        <button onClick={handleClear} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }} title="Borrar (Backspace)">⌫</button>
-        <button onClick={() => setModoNotas(m => !m)} style={{ marginRight: 8, background: modoNotas ? '#ffd54f' : '#eee', fontWeight: 'bold', borderRadius: 6, border: '1px solid #ccc', padding: '6px 12px' }} title="Modo Notas (P)">
-          {modoNotas ? 'Modo Notas: ON' : 'Modo Notas: OFF'}
-        </button>
-        {[1,2,3,4,5,6,7,8,9].map(n => (
-          <button key={n} onClick={() => handleButton(n)}
-            disabled={numerosCompletados[n] >= 9}
-            style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: numerosCompletados[n] >= 9 ? '#ccc' : '#fff', boxShadow: '0 1px 2px #0001', opacity: numerosCompletados[n] >= 9 ? 0.5 : 1 }}>
-            {n}
-          </button>
-        ))}
-        <button onClick={handleUndo} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }} title="Deshacer (U)">⟲</button>
+    <div style={{ display: 'flex', flexDirection: 'row' }}>
+      {/* Lateral de miembros */}
+      <div style={{ minWidth: 180, borderRight: '2px solid #eee', padding: 16, background: '#fafafa', height: '100%' }}>
+        <h4>Miembros</h4>
+        <ul style={{ listStyle: 'none', padding: 0 }}>
+          {miembros.map((j, idx) => (
+            <li key={j.nombre} style={{ marginBottom: 8, fontWeight: sala.jugadores?.[0]?.nombre === j.nombre ? 'bold' : 'normal', color: j.color || '#333' }}>
+              {j.nombre} {idx === 0 ? <span style={{ fontSize: 12, color: '#888' }}>(anfitrión)</span> : ''}
+            </li>
+          ))}
+        </ul>
       </div>
-      <div style={{ marginBottom: 8, textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
-        Tiempo: {format(tiempo)}
-      </div>
-      <div style={{ marginBottom: 8, textAlign: 'center' }}>
-        {Object.entries(errores).map(([nombre, err]) => (
-          <span key={nombre} style={{ margin: 8, color: nombre === sala.nombre ? sala.color : '#333' }}>
-            {nombre}: {err} errores
-          </span>
-        ))}
-      </div>
-      <div style={{ display: 'inline-block', border: '2px solid #333', borderRadius: 6, background: '#fff' }}>
-        {board.map((fila, r) => (
-          <div key={r} style={{ display: 'flex' }}>
-            {fila.map((celda, c) => {
-              // Bordes gruesos para bloques 3x3
-              const isSelected = selected.row === r && selected.col === c;
-              const isRow = selected.row === r;
-              const isCol = selected.col === c;
-              const startRow = selected.row !== null ? selected.row - selected.row % 3 : -1;
-              const startCol = selected.col !== null ? selected.col - selected.col % 3 : -1;
-              const isBlock = selected.row !== null && selected.col !== null &&
-                r >= startRow && r < startRow + 3 && c >= startCol && c < startCol + 3;
-              const isHighlighted = isRow || isCol || isBlock;
-              // Nuevo: celda bloqueada y resaltada
-              const isFixedAndHighlighted = isHighlighted && celda.fixed;
-              const style = {
-                width: 36,
-                height: 36,
-                textAlign: 'center',
-                fontSize: 20,
-                borderTop: r % 3 === 0 ? '2.5px solid #333' : '1px solid #bbb',
-                borderLeft: c % 3 === 0 ? '2.5px solid #333' : '1px solid #bbb',
-                borderRight: c === 8 ? '2.5px solid #333' : '',
-                borderBottom: r === 8 ? '2.5px solid #333' : '',
-                background: celda.fixed ? '#eee' : (celda.color || '#fff'),
-                outline: 'none',
-                fontWeight: celda.fixed ? 'bold' : 'normal',
-                cursor: celda.fixed ? 'not-allowed' : 'pointer',
-                borderRadius: 0,
-                boxSizing: 'border-box',
-                boxShadow: '',
-                transition: 'background 0.2s',
-              };
-              if (isSelected) {
-                style.border = `2.5px solid ${sala.color}`;
-                style.zIndex = 2;
-                style.boxShadow = `0 0 0 2px ${sala.color}`;
-              } else if (isFixedAndHighlighted) {
-                // Más opaco/intenso para bloqueadas resaltadas
-                style.background = `${sala.color}cc`;
-                style.boxShadow = `0 0 0 2px ${sala.color}99`;
-              } else if (isHighlighted) {
-                // Más oscuro para resaltado normal (no bloqueadas)
-                style.background = `${sala.color}55`;
-                style.boxShadow = `0 0 0 2px ${sala.color}44`;
-              }
-              // Iluminado de celdas con el mismo número seleccionado (si hay número seleccionado)
-              const isSameNumber = numeroSeleccionado && celda.value === numeroSeleccionado;
-              if (isSameNumber) {
-                style.background = '#b3e5fc';
-                style.boxShadow = '0 0 0 2px #0288d1';
-              }
-              if (selecciones.some(s => s.row === r && s.col === c)) {
-                const colorOtro = selecciones.find(s => s.row === r && s.col === c).color;
-                style.border = `2.5px solid ${colorOtro}`;
-                style.zIndex = 2;
-                style.boxShadow = `0 0 0 2px ${colorOtro}`;
-              }
-              return (
-                <div key={c} style={{ position: 'relative' }}
-                  onMouseDown={() => handleMouseDown(r, c)}
-                  onMouseEnter={() => handleMouseEnter(r, c)}
-                  onMouseUp={handleMouseUp}
-                  onTouchStart={() => handleCellTap(r, c)}
-                  className={multiSelect.some(sel => sel.row === r && sel.col === c) ? 'multi-selected' : ''}
-                >
-                  <input
-                    value={celda.value}
-                    maxLength={1}
-                    id={`celda-${r}-${c}`}
-                    disabled={false} // Permite focus/click en todas las celdas
-                    onFocus={() => handleFocus(r, c)}
-                    onChange={e => {
-                      if (celda.fixed) return; // No permite modificar bloqueadas
-                      const val = e.target.value.replace(/[^1-9]/, '');
-                      if (!val) return;
-                      handleInput(r, c, val);
-                    }}
-                    onKeyDown={e => {
-                      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
-                        handleArrow(e, r, c);
-                        return;
-                      }
-                      if (celda.fixed) {
-                        e.preventDefault();
-                        return;
-                      }
-                      if (/^[1-9]$/.test(e.key)) {
-                        e.preventDefault();
-                        handleInput(r, c, e.key);
-                      } else if (e.key === 'Backspace' || e.key === 'Delete') {
-                        e.preventDefault();
-                        if (!celda.fixed && celda.value !== '') handleInput(r, c, celda.value);
-                      }
-                    }}
-                    style={style}
-                    readOnly={celda.fixed}
-                  />
-                  {/* Notas en la celda */}
-                  {!celda.value && celda.notas && celda.notas.length > 0 && (
-                    <div style={{
-                      position: 'absolute',
-                      top: 2,
-                      left: 2,
-                      width: 32,
-                      height: 32,
-                      fontSize: 10,
-                      color: '#888',
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      pointerEvents: 'none',
-                    }}>
-                      {Array(9).fill(0).map((_, i) => (
-                        <div key={i} style={{ width: '33%', height: '33%', textAlign: 'center' }}>
-                          {celda.notas.includes((i+1).toString()) ? (i+1) : ''}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+      {/* Tablero y controles */}
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'inline-block', border: '3px solid #333', marginTop: 24, background: '#fafafa', borderRadius: 10, boxShadow: '0 2px 12px #0002', padding: 16 }}>
+          <div style={{ marginBottom: 8, textAlign: 'center' }}>
+            <button onClick={handleClear} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }} title="Borrar (Backspace)">⌫</button>
+            <button onClick={() => setModoNotas(m => !m)} style={{ marginRight: 8, background: modoNotas ? '#ffd54f' : '#eee', fontWeight: 'bold', borderRadius: 6, border: '1px solid #ccc', padding: '6px 12px' }} title="Modo Notas (P)">
+              {modoNotas ? 'Modo Notas: ON' : 'Modo Notas: OFF'}
+            </button>
+            {[1,2,3,4,5,6,7,8,9].map(n => (
+              <button key={n} onClick={() => handleButton(n)}
+                disabled={numerosCompletados[n] >= 9}
+                style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: numerosCompletados[n] >= 9 ? '#ccc' : '#fff', boxShadow: '0 1px 2px #0001', opacity: numerosCompletados[n] >= 9 ? 0.5 : 1 }}>
+                {n}
+              </button>
+            ))}
+            <button onClick={handleUndo} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }} title="Deshacer (U)">⟲</button>
           </div>
-        ))}
+          <div style={{ marginBottom: 8, textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
+            Tiempo: {format(tiempo)}
+          </div>
+          <div style={{ marginBottom: 8, textAlign: 'center' }}>
+            {Object.entries(errores).map(([nombre, err]) => (
+              <span key={nombre} style={{ margin: 8, color: nombre === sala.nombre ? sala.color : '#333' }}>
+                {nombre}: {err} errores
+              </span>
+            ))}
+          </div>
+          <div style={{ display: 'inline-block', border: '2px solid #333', borderRadius: 6, background: '#fff' }}>
+            {board.map((fila, r) => (
+              <div key={r} style={{ display: 'flex' }}>
+                {fila.map((celda, c) => {
+                  // Bordes gruesos para bloques 3x3
+                  const isSelected = selected.row === r && selected.col === c;
+                  const isRow = selected.row === r;
+                  const isCol = selected.col === c;
+                  const startRow = selected.row !== null ? selected.row - selected.row % 3 : -1;
+                  const startCol = selected.col !== null ? selected.col - selected.col % 3 : -1;
+                  const isBlock = selected.row !== null && selected.col !== null &&
+                    r >= startRow && r < startRow + 3 && c >= startCol && c < startCol + 3;
+                  const isHighlighted = isRow || isCol || isBlock;
+                  // Nuevo: celda bloqueada y resaltada
+                  const isFixedAndHighlighted = isHighlighted && celda.fixed;
+                  const style = {
+                    width: 36,
+                    height: 36,
+                    textAlign: 'center',
+                    fontSize: 20,
+                    borderTop: r % 3 === 0 ? '2.5px solid #333' : '1px solid #bbb',
+                    borderLeft: c % 3 === 0 ? '2.5px solid #333' : '1px solid #bbb',
+                    borderRight: c === 8 ? '2.5px solid #333' : '',
+                    borderBottom: r === 8 ? '2.5px solid #333' : '',
+                    background: celda.fixed ? '#eee' : (celda.color || '#fff'),
+                    outline: 'none',
+                    fontWeight: celda.fixed ? 'bold' : 'normal',
+                    cursor: celda.fixed ? 'not-allowed' : 'pointer',
+                    borderRadius: 0,
+                    boxSizing: 'border-box',
+                    boxShadow: '',
+                    transition: 'background 0.2s',
+                  };
+                  if (isSelected) {
+                    style.border = `2.5px solid ${sala.color}`;
+                    style.zIndex = 2;
+                    style.boxShadow = `0 0 0 2px ${sala.color}`;
+                  } else if (isFixedAndHighlighted) {
+                    // Más opaco/intenso para bloqueadas resaltadas
+                    style.background = `${sala.color}cc`;
+                    style.boxShadow = `0 0 0 2px ${sala.color}99`;
+                  } else if (isHighlighted) {
+                    // Más oscuro para resaltado normal (no bloqueadas)
+                    style.background = `${sala.color}55`;
+                    style.boxShadow = `0 0 0 2px ${sala.color}44`;
+                  }
+                  // Iluminado de celdas con el mismo número seleccionado (si hay número seleccionado)
+                  const isSameNumber = numeroSeleccionado && celda.value === numeroSeleccionado;
+                  if (isSameNumber) {
+                    style.background = '#b3e5fc';
+                    style.boxShadow = '0 0 0 2px #0288d1';
+                  }
+                  if (selecciones.some(s => s.row === r && s.col === c)) {
+                    const colorOtro = selecciones.find(s => s.row === r && s.col === c).color;
+                    style.border = `2.5px solid ${colorOtro}`;
+                    style.zIndex = 2;
+                    style.boxShadow = `0 0 0 2px ${colorOtro}`;
+                  }
+                  return (
+                    <div key={c} style={{ position: 'relative' }}
+                      onMouseDown={() => handleMouseDown(r, c)}
+                      onMouseEnter={() => handleMouseEnter(r, c)}
+                      onMouseUp={handleMouseUp}
+                      onTouchStart={() => handleCellTap(r, c)}
+                      className={multiSelect.some(sel => sel.row === r && sel.col === c) ? 'multi-selected' : ''}
+                    >
+                      <input
+                        value={celda.value}
+                        maxLength={1}
+                        id={`celda-${r}-${c}`}
+                        disabled={false} // Permite focus/click en todas las celdas
+                        onFocus={() => handleFocus(r, c)}
+                        onChange={e => {
+                          if (celda.fixed) return; // No permite modificar bloqueadas
+                          const val = e.target.value.replace(/[^1-9]/, '');
+                          if (!val) return;
+                          handleInput(r, c, val);
+                        }}
+                        onKeyDown={e => {
+                          if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+                            handleArrow(e, r, c);
+                            return;
+                          }
+                          if (celda.fixed) {
+                            e.preventDefault();
+                            return;
+                          }
+                          if (/^[1-9]$/.test(e.key)) {
+                            e.preventDefault();
+                            handleInput(r, c, e.key);
+                          } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                            e.preventDefault();
+                            if (!celda.fixed && celda.value !== '') handleInput(r, c, celda.value);
+                          }
+                        }}
+                        style={style}
+                        readOnly={celda.fixed}
+                      />
+                      {/* Notas en la celda */}
+                      {!celda.value && celda.notas && celda.notas.length > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 2,
+                          left: 2,
+                          width: 32,
+                          height: 32,
+                          fontSize: 10,
+                          color: '#888',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          pointerEvents: 'none',
+                        }}>
+                          {Array(9).fill(0).map((_, i) => (
+                            <div key={i} style={{ width: '33%', height: '33%', textAlign: 'center' }}>
+                              {celda.notas.includes((i+1).toString()) ? (i+1) : ''}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
