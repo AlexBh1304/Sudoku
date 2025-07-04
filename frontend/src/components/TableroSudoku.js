@@ -183,15 +183,18 @@ export default function TableroSudoku({ sala, socket }) {
   }
 
   return (
-    <div style={{ display: 'inline-block', border: '2px solid #333', marginTop: 24 }}>
+    <div style={{ display: 'inline-block', border: '3px solid #333', marginTop: 24, background: '#fafafa', borderRadius: 10, boxShadow: '0 2px 12px #0002', padding: 16 }}>
       <div style={{ marginBottom: 8, textAlign: 'center' }}>
-        <button onClick={() => setModoNotas(m => !m)} style={{ marginRight: 8, background: modoNotas ? '#ffd54f' : '#eee', fontWeight: 'bold' }}>
+        <button onClick={() => setModoNotas(m => !m)} style={{ marginRight: 8, background: modoNotas ? '#ffd54f' : '#eee', fontWeight: 'bold', borderRadius: 6, border: '1px solid #ccc', padding: '6px 12px' }}>
           {modoNotas ? 'Modo Notas: ON' : 'Modo Notas: OFF'}
         </button>
         {[1,2,3,4,5,6,7,8,9].map(n => (
-          <button key={n} onClick={() => handleButton(n)} style={{ width: 36, height: 36, margin: 2, fontSize: 18 }}>{n}</button>
+          <button key={n} onClick={() => handleButton(n)} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }}>{n}</button>
         ))}
-        <button onClick={handleClear} style={{ width: 36, height: 36, margin: 2, fontSize: 18 }}>⟲</button>
+        <button onClick={handleClear} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }}>⟲</button>
+      </div>
+      <div style={{ marginBottom: 8, textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
+        Tiempo: {format(tiempo)}
       </div>
       <div style={{ marginBottom: 8, textAlign: 'center' }}>
         {Object.entries(errores).map(([nombre, err]) => (
@@ -200,71 +203,101 @@ export default function TableroSudoku({ sala, socket }) {
           </span>
         ))}
       </div>
-      <div style={{ marginBottom: 8, textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
-        Tiempo: {format(tiempo)}
-      </div>
-      {board.map((fila, r) => (
-        <div key={r} style={{ display: 'flex' }}>
-          {fila.map((celda, c) => (
-            <div key={c} style={{ position: 'relative' }}>
-              <input
-                value={celda.value}
-                maxLength={1}
-                disabled={celda.fixed}
-                onFocus={() => handleFocus(r, c)}
-                onChange={e => {
-                  const val = e.target.value.replace(/[^1-9]/, '');
-                  if (!val) return;
-                  handleInput(r, c, val);
-                }}
-                onKeyDown={e => {
-                  if (/^[1-9]$/.test(e.key)) {
-                    e.preventDefault();
-                    handleInput(r, c, e.key);
-                  } else if (e.key === 'Backspace' || e.key === 'Delete') {
-                    e.preventDefault();
-                    if (!celda.fixed && celda.value !== '') handleInput(r, c, celda.value);
-                  }
-                }}
-                style={{
-                  width: 36,
-                  height: 36,
-                  textAlign: 'center',
-                  fontSize: 20,
-                  border: selected.row === r && selected.col === c ? `2.5px solid ${sala.color}` :
-                    (selecciones.some(s => s.row === r && s.col === c) ? `2px solid ${selecciones.find(s => s.row === r && s.col === c).color}` : '1px solid #aaa'),
-                  background: celda.fixed ? '#eee' : (celda.color || '#fff'),
-                  outline: 'none',
-                  fontWeight: celda.fixed ? 'bold' : 'normal',
-                  cursor: celda.fixed ? 'not-allowed' : 'pointer',
-                }}
-                readOnly={false}
-              />
-              {/* Notas en la celda */}
-              {!celda.value && celda.notas && celda.notas.length > 0 && (
-                <div style={{
-                  position: 'absolute',
-                  top: 2,
-                  left: 2,
-                  width: 32,
-                  height: 32,
-                  fontSize: 10,
-                  color: '#888',
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  pointerEvents: 'none',
-                }}>
-                  {Array(9).fill(0).map((_, i) => (
-                    <div key={i} style={{ width: '33%', height: '33%', textAlign: 'center' }}>
-                      {celda.notas.includes((i+1).toString()) ? (i+1) : ''}
+      <div style={{ display: 'inline-block', border: '2px solid #333', borderRadius: 6, background: '#fff' }}>
+        {board.map((fila, r) => (
+          <div key={r} style={{ display: 'flex' }}>
+            {fila.map((celda, c) => {
+              // Bordes gruesos para bloques 3x3
+              const isSelected = selected.row === r && selected.col === c;
+              const isRow = selected.row === r;
+              const isCol = selected.col === c;
+              const startRow = selected.row !== null ? selected.row - selected.row % 3 : -1;
+              const startCol = selected.col !== null ? selected.col - selected.col % 3 : -1;
+              const isBlock = selected.row !== null && selected.col !== null &&
+                r >= startRow && r < startRow + 3 && c >= startCol && c < startCol + 3;
+              const style = {
+                width: 36,
+                height: 36,
+                textAlign: 'center',
+                fontSize: 20,
+                borderTop: r % 3 === 0 ? '2.5px solid #333' : '1px solid #bbb',
+                borderLeft: c % 3 === 0 ? '2.5px solid #333' : '1px solid #bbb',
+                borderRight: c === 8 ? '2.5px solid #333' : '',
+                borderBottom: r === 8 ? '2.5px solid #333' : '',
+                background: celda.fixed ? '#eee' : (celda.color || '#fff'),
+                outline: 'none',
+                fontWeight: celda.fixed ? 'bold' : 'normal',
+                cursor: celda.fixed ? 'not-allowed' : 'pointer',
+                borderRadius: 0,
+                boxSizing: 'border-box',
+                boxShadow: '',
+                transition: 'background 0.2s',
+              };
+              if (isSelected) {
+                style.border = `2.5px solid ${sala.color}`;
+                style.zIndex = 2;
+                style.boxShadow = `0 0 0 2px ${sala.color}`;
+              } else if (isRow || isCol || isBlock) {
+                style.background = `${sala.color}22`;
+                style.boxShadow = `0 0 0 2px ${sala.color}33`;
+              }
+              if (selecciones.some(s => s.row === r && s.col === c)) {
+                const colorOtro = selecciones.find(s => s.row === r && s.col === c).color;
+                style.border = `2.5px solid ${colorOtro}`;
+                style.zIndex = 2;
+                style.boxShadow = `0 0 0 2px ${colorOtro}`;
+              }
+              return (
+                <div key={c} style={{ position: 'relative' }}>
+                  <input
+                    value={celda.value}
+                    maxLength={1}
+                    disabled={celda.fixed}
+                    onFocus={() => handleFocus(r, c)}
+                    onChange={e => {
+                      const val = e.target.value.replace(/[^1-9]/, '');
+                      if (!val) return;
+                      handleInput(r, c, val);
+                    }}
+                    onKeyDown={e => {
+                      if (/^[1-9]$/.test(e.key)) {
+                        e.preventDefault();
+                        handleInput(r, c, e.key);
+                      } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                        e.preventDefault();
+                        if (!celda.fixed && celda.value !== '') handleInput(r, c, celda.value);
+                      }
+                    }}
+                    style={style}
+                    readOnly={false}
+                  />
+                  {/* Notas en la celda */}
+                  {!celda.value && celda.notas && celda.notas.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 2,
+                      left: 2,
+                      width: 32,
+                      height: 32,
+                      fontSize: 10,
+                      color: '#888',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      pointerEvents: 'none',
+                    }}>
+                      {Array(9).fill(0).map((_, i) => (
+                        <div key={i} style={{ width: '33%', height: '33%', textAlign: 'center' }}>
+                          {celda.notas.includes((i+1).toString()) ? (i+1) : ''}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
-      ))}
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
