@@ -78,10 +78,10 @@ io.on('connection', (socket) => {
       }
       // Verifica con la solución y reglas de Sudoku
       let error = false;
+      let gameOver = false;
+      let victoria = false;
       if (value && row !== -1 && col !== -1 && sala.solucion) {
-        // 1. ¿Coincide con la solución?
         const correcto = sala.solucion[row][col].toString() === value;
-        // 2. ¿No hay otro igual en fila, columna o bloque?
         const unico = checkMove(board, row, col, value);
         error = !correcto || !unico;
         if (!sala.errores) sala.errores = {};
@@ -89,11 +89,21 @@ io.on('connection', (socket) => {
         if (jugador) {
           if (!sala.errores[jugador.nombre]) sala.errores[jugador.nombre] = 0;
           if (error) sala.errores[jugador.nombre]++;
+          if (sala.errores[jugador.nombre] >= 3) gameOver = true;
         }
       }
       sala.tablero = board;
+      // Verificar victoria
+      if (sala.solucion && board.every((fila, r) => fila.every((celda, c) => celda.value === sala.solucion[r][c].toString()))) {
+        victoria = true;
+      }
       io.to(codigo).emit('tableroActualizado', board);
       io.to(codigo).emit('erroresActualizados', sala.errores || {});
+      if (gameOver) {
+        io.to(codigo).emit('finJuego', { motivo: 'errores' });
+      } else if (victoria) {
+        io.to(codigo).emit('finJuego', { motivo: 'victoria' });
+      }
     }
   });
 

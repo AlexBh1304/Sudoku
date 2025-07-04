@@ -5,6 +5,7 @@ export default function TableroSudoku({ sala, socket }) {
   const [selected, setSelected] = useState({ row: null, col: null });
   const [selecciones, setSelecciones] = useState([]);
   const [errores, setErrores] = useState({});
+  const [finJuego, setFinJuego] = useState(null);
 
   // Recibe actualizaciones del tablero
   useEffect(() => {
@@ -37,6 +38,15 @@ export default function TableroSudoku({ sala, socket }) {
     socket.on('erroresActualizados', handleErrores);
     return () => {
       socket.off('erroresActualizados', handleErrores);
+    };
+  }, [socket]);
+
+  // Detecta fin de juego
+  useEffect(() => {
+    const handleFin = (data) => setFinJuego(data);
+    socket.on('finJuego', handleFin);
+    return () => {
+      socket.off('finJuego', handleFin);
     };
   }, [socket]);
 
@@ -92,6 +102,18 @@ export default function TableroSudoku({ sala, socket }) {
   };
 
   if (!board) return <div>Cargando tablero...</div>;
+
+  if (finJuego) {
+    return (
+      <div style={{ textAlign: 'center', marginTop: 40 }}>
+        {finJuego.motivo === 'victoria' ? (
+          <h2 style={{ color: 'green' }}>¡Felicidades, completaron el Sudoku!</h2>
+        ) : (
+          <h2 style={{ color: 'red' }}>¡Juego terminado por errores!</h2>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'inline-block', border: '2px solid #333', marginTop: 24 }}>
