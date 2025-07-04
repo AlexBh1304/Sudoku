@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import './TableroSudoku.css';
 
 export default function TableroSudoku({ sala, socket }) {
   const [board, setBoard] = useState(null);
@@ -98,15 +99,68 @@ export default function TableroSudoku({ sala, socket }) {
     return counts;
   }, [board]);
 
+  // Estado para selección múltiple
+  const [multiSelect, setMultiSelect] = useState([]); // [{row, col}]
+  const [dragging, setDragging] = useState(false);
+
+  // Iniciar selección múltiple
+  const handleMouseDown = (row, col) => {
+    if (!modoNotas) return;
+    if (board[row][col].value) return; // No seleccionar si ya tiene número
+    setDragging(true);
+    setMultiSelect([{ row, col }]);
+  };
+  const handleMouseEnter = (row, col) => {
+    if (!modoNotas || !dragging) return;
+    if (board[row][col].value) return; // No seleccionar si ya tiene número
+    setMultiSelect(prev => {
+      if (prev.some(sel => sel.row === row && sel.col === col)) return prev;
+      return [...prev, { row, col }];
+    });
+  };
+  const handleMouseUp = () => {
+    setDragging(false);
+  };
+  // Para móviles: tap para agregar/quitar de la selección
+  const handleCellTap = (row, col) => {
+    if (!modoNotas) return;
+    if (board[row][col].value) return; // No seleccionar si ya tiene número
+    setMultiSelect(prev => {
+      if (prev.some(sel => sel.row === row && sel.col === col)) {
+        return prev.filter(sel => !(sel.row === row && sel.col === col));
+      } else {
+        return [...prev, { row, col }];
+      }
+    });
+  };
+  // Limpiar selección múltiple al salir de modo notas o al input
+  useEffect(() => { if (!modoNotas) setMultiSelect([]); }, [modoNotas]);
+
   // Modificar handleInput para bloquear input de números completados
   const handleInput = (row, col, value) => {
     if (!board) return;
-    if (numerosCompletados[value] >= 9) return; // Bloquea input por teclado si ya hay 9
+    if (numerosCompletados[value] >= 9) return;
     const celda = board[row][col];
     if (celda.fixed) return;
     if (!/^[1-9]$/.test(value)) return;
     let nuevo;
-    if (modoNotas) {
+    if (modoNotas && multiSelect.length > 1) {
+      // Input en todas las seleccionadas
+      nuevo = board.map((fila, r) =>
+        fila.map((c, cidx) => {
+          if (multiSelect.some(sel => sel.row === r && sel.col === cidx) && !c.fixed) {
+            const notas = c.notas || [];
+            const idx = notas.indexOf(value);
+            const nuevasNotas = idx === -1 ? [...notas, value].sort() : notas.filter(n => n !== value);
+            return { ...c, notas: nuevasNotas };
+          }
+          return c;
+        })
+      );
+      guardarHistorial(board.map(fila => fila.map(c => ({ ...c }))));
+
+      setMultiSelect([]);
+    } else if (modoNotas) {
       // Modo notas: toggle el número en el array de notas
       const notas = celda.notas || [];
       const idx = notas.indexOf(value);
@@ -356,7 +410,13 @@ export default function TableroSudoku({ sala, socket }) {
                 style.boxShadow = `0 0 0 2px ${colorOtro}`;
               }
               return (
-                <div key={c} style={{ position: 'relative' }}>
+                <div key={c} style={{ position: 'relative' }}
+                  onMouseDown={() => handleMouseDown(r, c)}
+                  onMouseEnter={() => handleMouseEnter(r, c)}
+                  onMouseUp={handleMouseUp}
+                  onTouchStart={() => handleCellTap(r, c)}
+                  className={multiSelect.some(sel => sel.row === r && sel.col === c) ? 'multi-selected' : ''}
+                >
                   <input
                     value={celda.value}
                     maxLength={1}
@@ -419,3 +479,6 @@ export default function TableroSudoku({ sala, socket }) {
     </div>
   );
 }
+
+// CSS sugerido para multi-selected:
+// .multi-selected input { background: #ffe082 !important; }
