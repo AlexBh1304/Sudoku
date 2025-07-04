@@ -411,9 +411,22 @@ export default function TableroSudoku({ sala, socket }) {
   if (finJuego) {
     // Mostrar resumen y opción de reinicio si es anfitrión
     const esAnfitrion = miembros.length > 0 && miembros[0].nombre === sala.nombre;
+    // Mostrar tiempos contrarreloj si aplica
+    let tiempoUsado = null, tiempoRestante = null;
+    if (salaLocal.modo === 'contrarreloj' && finJuego.tiempoUsado !== undefined) {
+      tiempoUsado = finJuego.tiempoUsado;
+      tiempoRestante = finJuego.tiempoRestante;
+    }
     return (
       <div style={{ textAlign: 'center', marginTop: 40 }}>
-        <h3>Tiempo final: {format(tiempoFinal)}</h3>
+        {salaLocal.modo === 'contrarreloj' && tiempoUsado !== null ? (
+          <>
+            <h3>¡Tiempo empleado: {format(tiempoUsado)}!</h3>
+            <h4>Tiempo restante: {format(tiempoRestante)}</h4>
+          </>
+        ) : (
+          <h3>Tiempo final: {format(tiempoFinal)}</h3>
+        )}
         {finJuego.motivo === 'victoria' ? (
           <h2 style={{ color: 'green' }}>¡Felicidades, completaron el Sudoku!</h2>
         ) : finJuego.motivo === 'tiempo' ? (

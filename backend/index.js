@@ -159,10 +159,42 @@ io.on('connection', (socket) => {
       io.to(codigo).emit('erroresActualizados', sala.errores || {});
       if (gameOver) {
         sala.tiempoFin = Date.now();
-        io.to(codigo).emit('finJuego', { motivo: 'errores', tiempo: sala.tiempoFin - sala.tiempoInicio });
+        // Limpiar timeout si existe
+        if (salaTimeouts[codigo]) {
+          clearTimeout(salaTimeouts[codigo]);
+          delete salaTimeouts[codigo];
+        }
+        // Calcular tiempos para contrarreloj
+        let tiempoUsado = sala.tiempoFin - sala.tiempoInicio;
+        let tiempoRestante = 0;
+        if (sala.modo === 'contrarreloj' && sala.tiempoLimite) {
+          tiempoRestante = Math.max(0, sala.tiempoLimite - sala.tiempoFin);
+        }
+        io.to(codigo).emit('finJuego', {
+          motivo: 'errores',
+          tiempo: tiempoUsado,
+          tiempoUsado,
+          tiempoRestante
+        });
       } else if (victoria) {
         sala.tiempoFin = Date.now();
-        io.to(codigo).emit('finJuego', { motivo: 'victoria', tiempo: sala.tiempoFin - sala.tiempoInicio });
+        // Limpiar timeout si existe
+        if (salaTimeouts[codigo]) {
+          clearTimeout(salaTimeouts[codigo]);
+          delete salaTimeouts[codigo];
+        }
+        // Calcular tiempos para contrarreloj
+        let tiempoUsado = sala.tiempoFin - sala.tiempoInicio;
+        let tiempoRestante = 0;
+        if (sala.modo === 'contrarreloj' && sala.tiempoLimite) {
+          tiempoRestante = Math.max(0, sala.tiempoLimite - sala.tiempoFin);
+        }
+        io.to(codigo).emit('finJuego', {
+          motivo: 'victoria',
+          tiempo: tiempoUsado,
+          tiempoUsado,
+          tiempoRestante
+        });
       }
     }
   });
@@ -199,6 +231,11 @@ io.on('connection', (socket) => {
   socket.on('reiniciarPartida', ({ codigo, dificultad, modo }) => {
     const sala = getSala(codigo);
     if (!sala) return;
+    // Limpiar timeout si existe
+    if (salaTimeouts[codigo]) {
+      clearTimeout(salaTimeouts[codigo]);
+      delete salaTimeouts[codigo];
+    }
     const { tablero, solucion } = generarSudoku(dificultad);
     sala.tablero = tablero;
     sala.solucion = solucion;
@@ -226,8 +263,40 @@ io.on('connection', (socket) => {
       if (sala.dificultad === 'media') minutos = 20;
       if (sala.dificultad === 'dificil') minutos = 30;
       sala.tiempoLimite = sala.tiempoInicio + minutos * 60 * 1000;
+      // Limpiar timeout anterior si existe
+      if (salaTimeouts[codigo]) {
+        clearTimeout(salaTimeouts[codigo]);
+        delete salaTimeouts[codigo];
+      }
+      // Programar fin de partida por tiempo
+      const msRestantes = sala.tiempoLimite - sala.tiempoInicio;
+      salaTimeouts[codigo] = setTimeout(() => {
+        // Verificar que la sala sigue activa
+        const salaAct = getSala(codigo);
+        if (salaAct && salaAct.tiempoInicio && salaAct.modo === 'contrarreloj') {
+          salaAct.tiempoFin = Date.now();
+          // Calcular tiempos para contrarreloj
+          let tiempoUsado = salaAct.tiempoFin - salaAct.tiempoInicio;
+          let tiempoRestante = 0;
+          if (salaAct.tiempoLimite) {
+            tiempoRestante = Math.max(0, salaAct.tiempoLimite - salaAct.tiempoFin);
+          }
+          io.to(codigo).emit('finJuego', {
+            motivo: 'tiempo',
+            tiempo: tiempoUsado,
+            tiempoUsado,
+            tiempoRestante
+          });
+        }
+        delete salaTimeouts[codigo];
+      }, msRestantes);
     } else {
       sala.tiempoLimite = null;
+      // Limpiar timeout si existe
+      if (salaTimeouts[codigo]) {
+        clearTimeout(salaTimeouts[codigo]);
+        delete salaTimeouts[codigo];
+      }
     }
     io.to(codigo).emit('temporizador', { inicio: sala.tiempoInicio, limite: sala.tiempoLimite });
     io.to(codigo).emit('iniciarTemporizador');
@@ -266,7 +335,11 @@ io.on('connection', (socket) => {
     console.log(`[SALA] Colores disponibles: ${COLORES_POSIBLES.filter(c => !sala.colores.includes(c)).join(', ')}`);
   });
 
-  // --- LOGS Y LIMPIEZA AL DESCONECTAR USUARIO ---
+  // --- GESTIÓN DE TIMEOUTS DE CONTRARRELOJ ---
+  // Mapa para guardar timeouts por sala
+  const salaTimeouts = {};
+
+  // --- Limpiar timeout si la sala se elimina por desconexión ---
   socket.on('disconnect', () => {
     const user = socketToUser[socket.id];
     if (!user) return;
@@ -288,6 +361,11 @@ io.on('connection', (socket) => {
       if (sala.jugadores.length === 0) {
         // Eliminar sala si está vacía
         delete salas[codigo];
+        // Limpiar timeout si existe
+        if (salaTimeouts[codigo]) {
+          clearTimeout(salaTimeouts[codigo]);
+          delete salaTimeouts[codigo];
+        }
         console.log(`[SALA] Sala ${codigo} eliminada por estar vacía.`);
       } else {
         io.to(codigo).emit('salaActualizada', getSala(codigo));
