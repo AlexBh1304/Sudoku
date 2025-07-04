@@ -321,10 +321,16 @@ export default function TableroSudoku({ sala, socket }) {
     return () => window.removeEventListener('keydown', handleGlobalKey);
   }, [finJuego, handleUndo, handleClear]);
 
+  // Estado para dificultad actual (para mostrar en la esquina)
+  const [dificultadActual, setDificultadActual] = useState(sala.dificultad || 'facil');
+  useEffect(() => {
+    setDificultadActual(sala.dificultad || 'facil');
+  }, [sala.dificultad]);
   // Hooks para reinicio de partida (deben ir fuera de condicionales)
   const [dificultadNueva, setDificultadNueva] = useState(sala.dificultad || 'facil');
   const [reiniciando, setReiniciando] = useState(false);
   useEffect(() => {
+    // Actualizar dificultad al reiniciar partida
     const handler = ({ dificultad }) => {
       setFinJuego(null);
       setTiempoFinal(null);
@@ -332,6 +338,7 @@ export default function TableroSudoku({ sala, socket }) {
       setModoNotas(false);
       setMultiSelect([]);
       setDificultadNueva(dificultad);
+      setDificultadActual(dificultad); // <-- actualizar dificultad visible
       setReiniciando(false);
     };
     socket.on('partidaReiniciada', handler);
@@ -395,6 +402,12 @@ export default function TableroSudoku({ sala, socket }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'row' }}>
+      {/* Esquina superior derecha: código de sala y modo */}
+      <div style={{ position: 'fixed', top: 18, right: 24, zIndex: 10, background: '#fff', border: '2px solid #333', borderRadius: 8, padding: '8px 18px', boxShadow: '0 2px 8px #0002', fontSize: 15, fontWeight: 'bold', color: '#333', minWidth: 120, textAlign: 'right' }}>
+        <div>Código: <span style={{ fontFamily: 'monospace', letterSpacing: 1 }}>{sala.codigo}</span></div>
+        <div>Dificultad: <span style={{ textTransform: 'capitalize' }}>{dificultadActual}</span></div>
+        <div style={{ fontWeight: 400, fontSize: 14, marginTop: 4 }}>Modo: <span style={{ textTransform: 'capitalize' }}>{sala.modo || 'clásico'}</span></div>
+      </div>
       {/* Lateral de miembros */}
       <div style={{ minWidth: 180, borderRight: '2px solid #eee', padding: 16, background: '#fafafa', height: '100%' }}>
         <h4>Miembros</h4>
