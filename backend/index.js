@@ -165,11 +165,17 @@ io.on('connection', (socket) => {
     const sala = getSala(codigo);
     if (sala && sala.tablero) {
       socket.emit('tableroActualizado', sala.tablero);
+      if (sala.tiempoInicio) {
+        socket.emit('temporizador', { inicio: sala.tiempoInicio });
+      }
     } else if (sala) {
       // Si no existe, inicializa y envía
       const { getOrCreateTablero } = require('./sala/salaManager');
       const tablero = getOrCreateTablero(codigo);
       socket.emit('tableroActualizado', tablero);
+      if (sala.tiempoInicio) {
+        socket.emit('temporizador', { inicio: sala.tiempoInicio });
+      }
     }
   });
 
