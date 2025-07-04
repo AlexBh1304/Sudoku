@@ -232,6 +232,30 @@ export default function TableroSudoku({ sala, socket }) {
     }
   };
 
+  // Shortcuts de teclado globales
+  useEffect(() => {
+    const handleGlobalKey = (e) => {
+      if (finJuego) return;
+      if (e.target.tagName !== 'INPUT') return;
+      if (e.key === 'p' || e.key === 'P') {
+        setModoNotas(m => !m);
+        e.preventDefault();
+      } else if (e.key === 'u' || e.key === 'U') {
+        handleUndo();
+        e.preventDefault();
+      } else if (e.key === 'Escape') {
+        setSelected({ row: null, col: null });
+        setNumeroSeleccionado(null);
+        e.preventDefault();
+      } else if (e.key === 'Backspace' || e.key === 'Delete') {
+        handleClear();
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKey);
+    return () => window.removeEventListener('keydown', handleGlobalKey);
+  }, [finJuego, handleUndo, handleClear]);
+
   if (!board) return <div>Cargando tablero...</div>;
 
   if (finJuego) {
@@ -250,7 +274,8 @@ export default function TableroSudoku({ sala, socket }) {
   return (
     <div style={{ display: 'inline-block', border: '3px solid #333', marginTop: 24, background: '#fafafa', borderRadius: 10, boxShadow: '0 2px 12px #0002', padding: 16 }}>
       <div style={{ marginBottom: 8, textAlign: 'center' }}>
-        <button onClick={() => setModoNotas(m => !m)} style={{ marginRight: 8, background: modoNotas ? '#ffd54f' : '#eee', fontWeight: 'bold', borderRadius: 6, border: '1px solid #ccc', padding: '6px 12px' }}>
+        <button onClick={handleClear} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }} title="Borrar (Backspace)">⌫</button>
+        <button onClick={() => setModoNotas(m => !m)} style={{ marginRight: 8, background: modoNotas ? '#ffd54f' : '#eee', fontWeight: 'bold', borderRadius: 6, border: '1px solid #ccc', padding: '6px 12px' }} title="Modo Notas (P)">
           {modoNotas ? 'Modo Notas: ON' : 'Modo Notas: OFF'}
         </button>
         {[1,2,3,4,5,6,7,8,9].map(n => (
@@ -260,7 +285,7 @@ export default function TableroSudoku({ sala, socket }) {
             {n}
           </button>
         ))}
-        <button onClick={handleUndo} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }}>⟲</button>
+        <button onClick={handleUndo} style={{ width: 36, height: 36, margin: 2, fontSize: 18, borderRadius: 6, border: '1px solid #bbb', background: '#fff', boxShadow: '0 1px 2px #0001' }} title="Deshacer (U)">⟲</button>
       </div>
       <div style={{ marginBottom: 8, textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
         Tiempo: {format(tiempo)}
