@@ -282,6 +282,17 @@ export default function TableroSudoku({ sala, socket }) {
     if (newRow !== row || newCol !== col) {
       e.preventDefault();
       const nextInput = document.getElementById(`celda-${newRow}-${newCol}`);
+      if (modoNotas && e.shiftKey) {
+        // Selección múltiple con shift
+        if (!board[newRow][newCol].value) {
+          setMultiSelect(prev => {
+            if (prev.some(sel => sel.row === newRow && sel.col === newCol)) return prev;
+            return [...prev, { row: newRow, col: newCol }];
+          });
+        }
+      } else {
+        setMultiSelect([]); // Limpiar selección múltiple si no hay shift
+      }
       if (nextInput) nextInput.focus();
     }
   };
