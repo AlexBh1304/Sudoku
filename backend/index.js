@@ -83,7 +83,7 @@ io.on('connection', (socket) => {
       let error = false;
       let gameOver = false;
       let victoria = false;
-      let nuevoTablero = board;
+      let nuevoTablero = JSON.parse(JSON.stringify(board)); // deep copy para evitar referencias
       if (value && row !== -1 && col !== -1 && sala.solucion) {
         const correcto = sala.solucion[row][col].toString() === value;
         const unico = checkMove(board, row, col, value);
@@ -97,8 +97,37 @@ io.on('connection', (socket) => {
         }
         // Si es correcto y único, elimina notas en todo el tablero
         if (correcto && !error) {
-          nuevoTablero = eliminarNotasTablero(board, row, col, value);
+          nuevoTablero = eliminarNotasTablero(nuevoTablero, row, col, value);
         }
+        // --- BLOQUEO DE FILA, COLUMNA Y BLOQUE COMPLETOS ---
+        if (!error && correcto) {
+          // Fila
+          const filaCompleta = nuevoTablero[row].every((c, idx) => c.value === sala.solucion[row][idx].toString());
+          if (filaCompleta) {
+            nuevoTablero[row] = nuevoTablero[row].map(c => ({ ...c, fixed: true }));
+          }
+          // Columna
+          const colCompleta = nuevoTablero.every((f, ridx) => f[col].value === sala.solucion[ridx][col].toString());
+          if (colCompleta) {
+            for (let r = 0; r < 9; r++) {
+              nuevoTablero[r][col] = { ...nuevoTablero[r][col], fixed: true };
+            }
+          }
+          // Bloque
+          const startRow = row - row % 3, startCol = col - col % 3;
+          let bloqueCompleto = true;
+          for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+            const r = startRow + i, c = startCol + j;
+            if (nuevoTablero[r][c].value !== sala.solucion[r][c].toString()) bloqueCompleto = false;
+          }
+          if (bloqueCompleto) {
+            for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+              const r = startRow + i, c = startCol + j;
+              nuevoTablero[r][c] = { ...nuevoTablero[r][c], fixed: true };
+            }
+          }
+        }
+        // --- FIN BLOQUEO ---
       }
       sala.tablero = nuevoTablero;
       if (sala.solucion && nuevoTablero.every((fila, r) => fila.every((celda, c) => celda.value === sala.solucion[r][c].toString()))) {
