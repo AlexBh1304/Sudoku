@@ -343,7 +343,7 @@ export default function TableroSudoku({ sala, socket }) {
 
   if (finJuego) {
     // Mostrar resumen y opción de reinicio si es anfitrión
-    const esAnfitrion = sala.esAnfitrion || sala.jugadores?.[0]?.nombre === sala.nombre;
+    const esAnfitrion = miembros.length > 0 && miembros[0].nombre === sala.nombre;
     return (
       <div style={{ textAlign: 'center', marginTop: 40 }}>
         <h3>Tiempo final: {format(tiempoFinal)}</h3>
