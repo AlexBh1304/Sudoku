@@ -65,12 +65,16 @@ export default function TableroSudoku({ sala, socket }) {
     const handleTemp = (data) => {
       setTiempoInicio(data.inicio);
       setTiempoLimite(data.limite || null);
+      // Si es modo clásico, activar temporizador visual siempre
+      if ((salaLocal.modo === 'clasico' || data.limite === null)) {
+        setTemporizadorActivo(true);
+      }
     };
     socket.on('temporizador', handleTemp);
     return () => {
       socket.off('temporizador', handleTemp);
     };
-  }, [socket]);
+  }, [socket, salaLocal.modo]);
 
   useEffect(() => {
     const handleFin = (data) => {
@@ -387,6 +391,14 @@ export default function TableroSudoku({ sala, socket }) {
       setTiempoInicio(null);
       setTiempoLimite(null);
       setTiempo(0);
+      // --- FIX: Forzar temporizador activo en modo clásico tras reinicio ---
+      if (modo === 'clasico') {
+        setTemporizadorActivo(true);
+      }
+      // --- FIN FIX ---
+      // --- FIX: Solicitar temporizador tras reinicio para sincronizar tiempoInicio ---
+      socket.emit('solicitarTablero', { codigo: sala.codigo });
+      // --- FIN FIX ---
     };
     socket.on('partidaReiniciada', handler);
     return () => socket.off('partidaReiniciada', handler);
@@ -549,7 +561,7 @@ export default function TableroSudoku({ sala, socket }) {
                 )}
               </div>
             ) : (
-              <>Tiempo: {format(tiempo)}</>
+              <span style={{ color: '#1976d2' }}>Tiempo: {format(tiempo)}</span>
             )}
           </div>
           <div style={{ marginBottom: 8, textAlign: 'center' }}>
@@ -685,6 +697,29 @@ export default function TableroSudoku({ sala, socket }) {
             ))}
           </div>
         </div>
+        {/* LOG VISUAL DE DEPURACIÓN DEL TEMPORIZADOR */}
+        <div style={{
+          background: '#f3f3f3',
+          border: '1px dashed #1976d2',
+          color: '#1976d2',
+          fontSize: 13,
+          padding: 6,
+          margin: '8px 0',
+          borderRadius: 6,
+          maxWidth: 400,
+          marginLeft: 'auto',
+          marginRight: 'auto',
+          textAlign: 'left',
+          opacity: 0.85
+        }}>
+          <b>Debug temporizador:</b><br />
+          <span>temporizadorActivo: <b>{String(temporizadorActivo)}</b></span><br />
+          <span>tiempoInicio: <b>{tiempoInicio ? new Date(tiempoInicio).toLocaleTimeString() + ' (' + tiempoInicio + ')' : 'null'}</b></span><br />
+          <span>tiempoLimite: <b>{tiempoLimite ? new Date(tiempoLimite).toLocaleTimeString() + ' (' + tiempoLimite + ')' : 'null'}</b></span><br />
+          <span>tiempoFinal: <b>{tiempoFinal ? new Date(tiempoFinal).toLocaleTimeString() + ' (' + tiempoFinal + ')' : 'null'}</b></span><br />
+          <span>finJuego: <b>{finJuego ? JSON.stringify(finJuego) : 'null'}</b></span>
+        </div>
+        {/* FIN LOG VISUAL DE DEPURACIÓN */}
       </div>
     </div>
   );

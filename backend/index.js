@@ -41,14 +41,21 @@ io.on('connection', (socket) => {
     sala.tablero = tablero;
     sala.solucion = solucion;
     sala.colores = [color];
-    sala.tiempoInicio = null; // <-- NO iniciar aún
-    sala.tiempoLimite = null;
+    // --- INICIAR TIEMPO AUTOMÁTICO EN CLÁSICO ---
+    if (sala.modo === 'clasico') {
+      sala.tiempoInicio = Date.now();
+      sala.tiempoLimite = null;
+      io.to(codigo).emit('temporizador', { inicio: sala.tiempoInicio, limite: null });
+      io.to(codigo).emit('iniciarTemporizador'); // <-- activar temporizador visual
+    } else {
+      sala.tiempoInicio = null;
+      sala.tiempoLimite = null;
+    }
     socket.join(codigo);
     socketToUser[socket.id] = { nombre, codigo };
     callback({ exito: true, codigo });
     io.to(codigo).emit('salaActualizada', getSala(codigo));
     io.to(codigo).emit('tableroActualizado', sala.tablero);
-    // NO emitir temporizador aún
     // Log de creación de sala
     console.log(`[SALA] Nueva sala creada: ${codigo} por ${nombre} (${color}) [${socket.id}]`);
     console.log(`[SALA] Jugadores en sala ${codigo}:`, sala.jugadores.map(j => `${j.nombre} (${j.id || 'sin id'})`).join(', '));
@@ -242,12 +249,25 @@ io.on('connection', (socket) => {
     sala.dificultad = dificultad;
     if (modo) sala.modo = modo;
     sala.errores = {};
-    sala.tiempoInicio = null; // <-- NO iniciar aún
-    sala.tiempoFin = null;
-    sala.tiempoLimite = null;
+    // --- INICIAR TIEMPO AUTOMÁTICO EN CLÁSICO AL REINICIAR ---
+    if (sala.modo === 'clasico') {
+      sala.tiempoInicio = Date.now();
+      sala.tiempoFin = null;
+      sala.tiempoLimite = null;
+      io.to(codigo).emit('temporizador', { inicio: sala.tiempoInicio, limite: null });
+      // Emitir 'iniciarTemporizador' a TODOS los jugadores (no solo anfitrión)
+      if (sala.jugadores && sala.jugadores.length > 0) {
+        sala.jugadores.forEach(j => {
+          if (j.id) io.to(j.id).emit('iniciarTemporizador');
+        });
+      }
+    } else {
+      sala.tiempoInicio = null;
+      sala.tiempoFin = null;
+      sala.tiempoLimite = null;
+    }
     io.to(codigo).emit('tableroActualizado', sala.tablero);
     io.to(codigo).emit('erroresActualizados', sala.errores);
-    // NO emitir temporizador aún
     io.to(codigo).emit('partidaReiniciada', { dificultad, modo: sala.modo });
   });
 
@@ -320,14 +340,21 @@ io.on('connection', (socket) => {
     sala.tablero = tablero;
     sala.solucion = solucion;
     sala.colores = [color];
-    sala.tiempoInicio = null; // <-- NO iniciar aún
-    sala.tiempoLimite = null;
+    // --- INICIAR TIEMPO AUTOMÁTICO EN CLÁSICO ---
+    if (sala.modo === 'clasico') {
+      sala.tiempoInicio = Date.now();
+      sala.tiempoLimite = null;
+      io.to(codigo).emit('temporizador', { inicio: sala.tiempoInicio, limite: null });
+      io.to(codigo).emit('iniciarTemporizador'); // <-- activar temporizador visual
+    } else {
+      sala.tiempoInicio = null;
+      sala.tiempoLimite = null;
+    }
     socket.join(codigo);
     socketToUser[socket.id] = { nombre, codigo };
     callback({ exito: true, codigo });
     io.to(codigo).emit('salaActualizada', getSala(codigo));
     io.to(codigo).emit('tableroActualizado', sala.tablero);
-    // NO emitir temporizador aún
     // Log de creación de sala
     console.log(`[SALA] Nueva sala creada: ${codigo} por ${nombre} (${color}) [${socket.id}]`);
     console.log(`[SALA] Jugadores en sala ${codigo}:`, sala.jugadores.map(j => `${j.nombre} (${j.id || 'sin id'})`).join(', '));
